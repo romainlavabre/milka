@@ -1,0 +1,98 @@
+// Electron entry point: window, IPC registration and services.
+import { join } from 'node:path'
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
+import type { ZodType } from 'zod'
+import { API_METHODS, type Api } from '@shared/api'
+import { createHandlers } from './ipc/handlers'
+import { schemas } from './ipc/schemas'
+
+// Keeps the data folder name stable (~/.config/milka) whatever the product name.
+app.setName('milka')
+if (process.env.MILKA_DATA_DIR) app.setPath('userData', process.env.MILKA_DATA_DIR)
+
+// Launched from a snap's terminal (JetBrains IDEs, VS Code…), SNAP_NAME is
+// inherited: libsecret then believes it runs confined and stores the keyring
+// key through the secret portal, where it cannot find it again at the next
+// launch, so every saved secret becomes unreadable. Drop it unless the app
+// really is that snap.
+if (process.env.SNAP_NAME && !(process.env.SNAP && process.execPath.startsWith(process.env.SNAP + '/'))) {
+  delete process.env.SNAP_NAME
+}
+
+let mainWindow: BrowserWindow | null = null
+
+function createWindow(): void {
+  mainWindow = new BrowserWindow({
+    width: 1440,
+    height: 900,
+    minWidth: 900,
+    minHeight: 600,
+    show: false,
+    title: 'Milka',
+    backgroundColor: '#16181d',
+    autoHideMenuBar: true,
+    icon: join(app.getAppPath(), 'build/icon.png'),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      spellcheck: false
+    }
+  })
+  mainWindow.once('ready-to-show', () => mainWindow?.show())
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+  // Links open in the browser, never inside the app.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  mainWindow.webContents.on('will-navigate', (event) => event.preventDefault())
+
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    void mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+  } else {
+    void mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+function isTrustedSender(frameUrl: string | undefined): boolean {
+  if (!frameUrl) return false
+  if (frameUrl.startsWith('file://')) return true
+  const devUrl = process.env.ELECTRON_RENDERER_URL
+  return !app.isPackaged && !!devUrl && frameUrl.startsWith(devUrl)
+}
+
+function registerIpc(api: Api): void {
+  for (const domain of Object.keys(API_METHODS) as (keyof Api)[]) {
+    for (const method of API_METHODS[domain]) {
+      const channel = `${domain}:${String(method)}`
+      const schema = (schemas[domain] as Record<string, ZodType>)[method as string]
+      const handler = (api[domain] as unknown as Record<string, (arg: unknown) => Promise<unknown>>)[method as string]
+      ipcMain.handle(channel, async (event, arg: unknown) => {
+        if (!isTrustedSender(event.senderFrame?.url)) throw new Error('Untrusted sender')
+        const parsed = schema.safeParse(arg)
+        if (!parsed.success) {
+          throw new Error(`Invalid request for ${channel}: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`)
+        }
+        return handler(parsed.data)
+      })
+    }
+  }
+}
+
+void app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
+  registerIpc(createHandlers())
+  createWindow()
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+})
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit()
+})

@@ -1,0 +1,26 @@
+appId: com.romainlavabre.milka
+productName: Milka
+executableName: milka
+directories:
+  output: dist
+  buildResources: build
+files:
+  - out/**
+  - build/icon.png
+  - package.json
+asarUnpack:
+  - '**/*.node'
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  syncDesktopName: true
+  icon: build/icon.png
+  maintainer: Romain Lavabre
+  synopsis: API client with git-shared workspaces, multiple bodies and CI-ready tests
+deb:
+  depends:
+    - git
+    - openssh-client
+artifactName: ${name}-${version}-${arch}.${ext}
