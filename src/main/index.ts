@@ -6,6 +6,7 @@ import { API_METHODS, type Api, type ApiEvents } from '@shared/api'
 import { createHandlers } from './ipc/handlers'
 import { schemas } from './ipc/schemas'
 import { SecretStore, createCipher } from './secrets'
+import { ContentService } from './workspace/content'
 import { WorkspaceManager } from './workspace/manager'
 
 // Keeps the data folder name stable (~/.config/milka) whatever the product name.
@@ -104,7 +105,9 @@ void app.whenReady().then(() => {
     changed: (state) => send('workspace:changed', state)
   })
 
-  registerIpc(createHandlers({ workspace, window: () => mainWindow, secretsEncrypted }))
+  const content = new ContentService(workspace, secrets)
+
+  registerIpc(createHandlers({ workspace, content, window: () => mainWindow, secretsEncrypted }))
   createWindow()
 
   let quitting = false

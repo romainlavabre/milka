@@ -2,7 +2,8 @@
 //
 // Every method takes a single object argument (validated with zod in main) and
 // is exposed on channel `${domain}:${method}`.
-import type { ConflictChoice, SyncStatus, WorkspaceRepo, WorkspaceState } from './types'
+import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '../core/model'
+import type { ConflictChoice, EnvironmentDraft, SyncStatus, WorkspaceRepo, WorkspaceState } from './types'
 
 export interface AppInfo {
   version: string
@@ -25,6 +26,29 @@ export interface Api {
     sync(args: { repoId: string }): Promise<SyncStatus>
     resolveConflicts(args: { repoId: string; choices: Record<string, ConflictChoice> }): Promise<SyncStatus>
   }
+  /** Content of the active workspace. `collection` is a collection slug, `path` a node path inside it. */
+  collections: {
+    list(): Promise<CollectionSummary[]>
+    get(args: { collection: string }): Promise<Collection>
+    /** Creates (collection null) or updates a collection; returns its slug. */
+    save(args: { collection: string | null; data: Collection }): Promise<string>
+    remove(args: { collection: string }): Promise<void>
+    getFolder(args: { collection: string; path: string }): Promise<Folder>
+    saveFolder(args: { collection: string; parent: string; path: string | null; data: Folder }): Promise<string>
+    removeFolder(args: { collection: string; path: string }): Promise<void>
+    getRequest(args: { collection: string; path: string }): Promise<HttpRequest>
+    saveRequest(args: { collection: string; parent: string; path: string | null; data: HttpRequest }): Promise<string>
+    duplicateRequest(args: { collection: string; path: string }): Promise<string>
+    removeRequest(args: { collection: string; path: string }): Promise<void>
+    /** Moves a node into `parent`, before the sibling `before` (at the end when null). */
+    move(args: { collection: string; from: string; parent: string; before: string | null }): Promise<string>
+  }
+  environments: {
+    list(args: { collection: string }): Promise<EnvironmentSummary[]>
+    get(args: { collection: string; env: string }): Promise<EnvironmentDraft>
+    save(args: { collection: string; env: string | null; data: Environment; secretValues: Record<string, string> }): Promise<string>
+    remove(args: { collection: string; env: string }): Promise<void>
+  }
   dialog: {
     openDirectory(args: { title: string }): Promise<string | null>
   }
@@ -44,6 +68,21 @@ export const API_EVENTS: (keyof ApiEvents)[] = ['workspace:status', 'workspace:c
 /** Method names per domain, used by the preload script to build the bridge. */
 export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
   workspace: ['state', 'clone', 'open', 'create', 'rename', 'remove', 'activate', 'setRemote', 'status', 'sync', 'resolveConflicts'],
+  collections: [
+    'list',
+    'get',
+    'save',
+    'remove',
+    'getFolder',
+    'saveFolder',
+    'removeFolder',
+    'getRequest',
+    'saveRequest',
+    'duplicateRequest',
+    'removeRequest',
+    'move'
+  ],
+  environments: ['list', 'get', 'save', 'remove'],
   dialog: ['openDirectory'],
   app: ['info']
 }

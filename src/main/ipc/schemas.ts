@@ -1,10 +1,15 @@
 // zod schemas validating every IPC payload coming from the renderer.
 import { z } from 'zod'
 import type { Api } from '@shared/api'
+import { collectionSchema, environmentSchema, folderSchema, requestSchema } from '@core/model'
 
 const none = z.undefined().or(z.object({}).strict())
 const repoId = z.string().min(1)
 const name = z.string().trim().min(1).max(200)
+// Paths are checked again against the collection folder by the store.
+const collection = z.string().min(1).max(200)
+const nodePath = z.string().min(1).max(1000)
+const env = z.string().min(1).max(200)
 
 export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } = {
   workspace: {
@@ -19,6 +24,26 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     status: z.object({ repoId }),
     sync: z.object({ repoId }),
     resolveConflicts: z.object({ repoId, choices: z.record(z.string(), z.enum(['mine', 'theirs'])) })
+  },
+  collections: {
+    list: none,
+    get: z.object({ collection }),
+    save: z.object({ collection: collection.nullable(), data: collectionSchema }),
+    remove: z.object({ collection }),
+    getFolder: z.object({ collection, path: nodePath }),
+    saveFolder: z.object({ collection, parent: z.string(), path: nodePath.nullable(), data: folderSchema }),
+    removeFolder: z.object({ collection, path: nodePath }),
+    getRequest: z.object({ collection, path: nodePath }),
+    saveRequest: z.object({ collection, parent: z.string(), path: nodePath.nullable(), data: requestSchema }),
+    duplicateRequest: z.object({ collection, path: nodePath }),
+    removeRequest: z.object({ collection, path: nodePath }),
+    move: z.object({ collection, from: nodePath, parent: z.string(), before: nodePath.nullable() })
+  },
+  environments: {
+    list: z.object({ collection }),
+    get: z.object({ collection, env }),
+    save: z.object({ collection, env: env.nullable(), data: environmentSchema, secretValues: z.record(z.string(), z.string()) }),
+    remove: z.object({ collection, env })
   },
   dialog: {
     openDirectory: z.object({ title: z.string() })

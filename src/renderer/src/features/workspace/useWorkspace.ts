@@ -2,8 +2,9 @@
 import { useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
-import type { SyncStatus } from '@shared/types'
+import type { SyncStatus, WorkspaceState } from '@shared/types'
 import { api, onEvent } from '../../lib/bridge'
+import { closeAllTabs } from '../../store'
 
 export function useWorkspace() {
   return useQuery({ queryKey: ['workspace'], queryFn: () => api.workspace.state(), staleTime: Infinity })
@@ -21,7 +22,7 @@ export function useSyncStatus(repoId: string | null | undefined): SyncStatus | n
 }
 
 /** Query keys holding workspace content, refreshed after a pull. */
-export const CONTENT_KEYS = [['collections'], ['collection'], ['request'], ['environments']]
+export const CONTENT_KEYS = [['collections'], ['collection'], ['folder'], ['request'], ['environments'], ['environment']]
 
 /** Subscribes to status events and refreshes the active repo status periodically. */
 export function useWorkspaceStatus(): void {
@@ -45,7 +46,13 @@ export function useWorkspaceStatus(): void {
   useEffect(
     () =>
       onEvent('workspace:changed', (state) => {
+        const previous = queryClient.getQueryData<WorkspaceState>(['workspace'])
         queryClient.setQueryData(['workspace'], state)
+        // Tabs belong to the collections of the previous workspace.
+        if (previous?.activeRepoId !== state.activeRepoId) {
+          closeAllTabs()
+          for (const queryKey of CONTENT_KEYS) void queryClient.removeQueries({ queryKey })
+        }
       }),
     [queryClient]
   )

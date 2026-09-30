@@ -5,6 +5,8 @@ import { useState } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import { DialogHost, Toaster } from './components/feedback'
 import { Button, EmptyState } from './components/ui'
+import { CollectionTree } from './features/collections/CollectionTree'
+import { MainArea } from './features/layout/MainArea'
 import { AddWorkspaceDialog } from './features/workspace/AddWorkspaceDialog'
 import { WorkspaceSwitcher } from './features/workspace/WorkspaceSwitcher'
 import { useActiveRepo, useWorkspaceStatus } from './features/workspace/useWorkspace'
@@ -19,11 +21,12 @@ export function App() {
         <Panel defaultSize="22" minSize={240} maxSize="45">
           <aside className="flex h-full flex-col bg-panel">
             <WorkspaceSwitcher />
+            {repo && <CollectionTree />}
           </aside>
         </Panel>
         <Separator className="resize-handle w-px" />
         <Panel minSize="40">
-          <main className="h-full min-w-0">{repo ? null : <Welcome />}</main>
+          <main className="h-full min-w-0">{repo ? <MainArea /> : <Welcome />}</main>
         </Panel>
       </Group>
       <Toaster />

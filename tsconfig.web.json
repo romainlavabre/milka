@@ -16,8 +16,9 @@
     "composite": true,
     "paths": {
       "@shared/*": ["./src/shared/*"],
+      "@core/*": ["./src/core/*"],
       "@/*": ["./src/renderer/src/*"]
     }
   },
-  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/preload/*.d.ts"]
+  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/core/model.ts", "src/preload/*.d.ts"]
 }

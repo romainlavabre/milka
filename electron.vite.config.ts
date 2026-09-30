@@ -15,6 +15,8 @@ export default defineConfig({
     resolve: { alias: shared }
   },
   renderer: {
+    // Monaco ships one chunk per language: listing them all drowns real warnings.
+    logLevel: 'warn',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: { ...shared, '@': resolve('src/renderer/src') }

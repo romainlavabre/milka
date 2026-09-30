@@ -1,4 +1,13 @@
 // Types shared by the main process and the renderer.
+import type { Environment } from '../core/model'
+
+export interface EnvironmentDraft {
+  environment: Environment
+  /** Local values of the variables listed in `environment.secrets`. */
+  secretValues: Record<string, string>
+  /** Stored secrets exist but cannot be decrypted (the OS keyring key changed). */
+  secretsUnreadable: boolean
+}
 
 /** A workspace: a git repository (or a plain folder) holding collections. */
 export interface WorkspaceRepo {
