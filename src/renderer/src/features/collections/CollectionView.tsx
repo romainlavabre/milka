@@ -37,7 +37,11 @@ export function CollectionView({ collection }: { collection: string }) {
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
         <Popover.Root>
-          <Popover.Trigger aria-label="Collection color" className="size-5 shrink-0 rounded-full ring-2 ring-border" style={{ background: draft.color }} />
+          <Popover.Trigger
+            aria-label="Collection color"
+            className="size-5 shrink-0 rounded-full ring-2 ring-border"
+            style={{ background: draft.color }}
+          />
           <Popover.Portal>
             <Popover.Content sideOffset={6} className="z-50 rounded-md border border-border bg-panel-2 p-1 shadow-xl">
               <ColorPalette value={draft.color} onChange={(color) => setDraft({ ...draft, color })} />
@@ -50,7 +54,14 @@ export function CollectionView({ collection }: { collection: string }) {
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
-        <Button variant={dirty ? 'primary' : 'secondary'} size="sm" icon={<Save className="size-3.5" />} loading={saving} disabled={!dirty} onClick={() => void save()}>
+        <Button
+          variant={dirty ? 'primary' : 'secondary'}
+          size="sm"
+          icon={<Save className="size-3.5" />}
+          loading={saving}
+          disabled={!dirty}
+          onClick={() => void save()}
+        >
           Save
         </Button>
       </div>
@@ -59,7 +70,14 @@ export function CollectionView({ collection }: { collection: string }) {
         {tab === 'environments' ? (
           <EnvironmentsPanel collection={collection} />
         ) : (
-          <SettingsPanel tab={tab} value={draft} onChange={setDraft} scope={`collection/${collection}`} collection={collection} allowInherit={false} />
+          <SettingsPanel
+            tab={tab}
+            value={draft}
+            onChange={setDraft}
+            scope={`collection/${collection}`}
+            collection={collection}
+            allowInherit={false}
+          />
         )}
       </div>
     </div>

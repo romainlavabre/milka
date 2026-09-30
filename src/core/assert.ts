@@ -43,7 +43,9 @@ export function check(op: AssertOperator, actual: unknown, rawExpected: unknown)
     case 'lte':
       return Number(actual) <= Number(expected)
     case 'contains':
-      return typeof actual === 'string' ? actual.includes(String(expected)) : Array.isArray(actual) && actual.some((item) => deepEqual(item, expected))
+      return typeof actual === 'string'
+        ? actual.includes(String(expected))
+        : Array.isArray(actual) && actual.some((item) => deepEqual(item, expected))
     case 'notContains':
       return !check('contains', actual, expected)
     case 'matches':
@@ -80,6 +82,8 @@ export function runAssertions(assertions: Assertion[], scope: ScriptScope): Test
         return { name, passed: false, error: `Cannot evaluate ${assertion.expr}: ${(error as Error).message}`, kind: 'assertion' as const }
       }
       const passed = check(assertion.op, actual, assertion.value)
-      return passed ? { name, passed, kind: 'assertion' as const } : { name, passed, error: `Actual value: ${show(actual)}`, kind: 'assertion' as const }
+      return passed
+        ? { name, passed, kind: 'assertion' as const }
+        : { name, passed, error: `Actual value: ${show(actual)}`, kind: 'assertion' as const }
     })
 }

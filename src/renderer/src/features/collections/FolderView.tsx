@@ -40,13 +40,27 @@ export function FolderView({ collection, path }: { collection: string; path: str
           value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
-        <Button variant={dirty ? 'primary' : 'secondary'} size="sm" icon={<Save className="size-3.5" />} loading={saving} disabled={!dirty} onClick={() => void save()}>
+        <Button
+          variant={dirty ? 'primary' : 'secondary'}
+          size="sm"
+          icon={<Save className="size-3.5" />}
+          loading={saving}
+          disabled={!dirty}
+          onClick={() => void save()}
+        >
           Save
         </Button>
       </div>
       <PanelTabs tabs={settingsTabs(draft)} value={tab} onChange={setTab} />
       <div className="min-h-0 flex-1">
-        <SettingsPanel tab={tab} value={draft} onChange={setDraft} scope={`folder/${collection}/${path}`} collection={collection} allowInherit />
+        <SettingsPanel
+          tab={tab}
+          value={draft}
+          onChange={setDraft}
+          scope={`folder/${collection}/${path}`}
+          collection={collection}
+          allowInherit
+        />
       </div>
     </div>
   )

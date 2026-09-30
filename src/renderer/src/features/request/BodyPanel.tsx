@@ -61,12 +61,21 @@ export function BodyPanel({ request, onChange }: { request: HttpRequest; onChang
       toast(`A body named "${name.trim()}" already exists`, 'warning')
       return
     }
-    onChange({ ...request, bodies: request.bodies.map((b) => (b.name === body.name ? { ...b, name: name.trim() } : b)), activeBody: name.trim() })
+    onChange({
+      ...request,
+      bodies: request.bodies.map((b) => (b.name === body.name ? { ...b, name: name.trim() } : b)),
+      activeBody: name.trim()
+    })
   }
 
   const remove = async (): Promise<void> => {
     if (!body) return
-    const ok = await confirm({ title: `Delete body "${body.name}"`, body: 'This payload variant is removed from the request.', confirmLabel: 'Delete', danger: true })
+    const ok = await confirm({
+      title: `Delete body "${body.name}"`,
+      body: 'This payload variant is removed from the request.',
+      confirmLabel: 'Delete',
+      danger: true
+    })
     if (!ok) return
     const bodies = request.bodies.filter((b) => b.name !== body.name)
     onChange({ ...request, bodies, activeBody: bodies[0]?.name ?? null })
@@ -95,14 +104,19 @@ export function BodyPanel({ request, onChange }: { request: HttpRequest; onChang
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
         <Menu.Root>
-          <Menu.Trigger className="flex h-7 max-w-64 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-xs outline-none hover:bg-hover" aria-label="Select body">
+          <Menu.Trigger
+            className="flex h-7 max-w-64 items-center gap-1.5 rounded-md border border-border bg-bg px-2 text-xs outline-none hover:bg-hover"
+            aria-label="Select body"
+          >
             <span className="truncate font-medium">{body.name}</span>
             {request.bodies.length > 1 && <span className="text-muted">({request.bodies.length})</span>}
             <ChevronDown className="size-3.5 shrink-0 text-muted" />
           </Menu.Trigger>
           <Menu.Portal>
             <Menu.Content align="start" sideOffset={4} className={menuContentClass}>
-              <Menu.Label className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted">Bodies — the selected one is sent</Menu.Label>
+              <Menu.Label className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                Bodies — the selected one is sent
+              </Menu.Label>
               <Menu.RadioGroup value={body.name} onValueChange={(name) => onChange({ ...request, activeBody: name })}>
                 {request.bodies.map((b) => (
                   <Menu.RadioItem key={b.name} value={b.name} className={menuItemClass}>
@@ -134,7 +148,12 @@ export function BodyPanel({ request, onChange }: { request: HttpRequest; onChang
             Format
           </Button>
         )}
-        <Select aria-label="Body type" className="h-7 w-44 text-xs" value={body.type} onChange={(e) => setBody({ type: e.target.value as BodyType })}>
+        <Select
+          aria-label="Body type"
+          className="h-7 w-44 text-xs"
+          value={body.type}
+          onChange={(e) => setBody({ type: e.target.value as BodyType })}
+        >
           {BODY_TYPES.map((type) => (
             <option key={type} value={type}>
               {TYPE_LABELS[type]}
@@ -165,7 +184,11 @@ function BodyContent({ body, setBody }: { body: Body; setBody: (patch: Partial<B
             extra={
               body.type === 'multipart'
                 ? (row, update) => (
-                    <select className="h-7 w-full bg-transparent text-xs outline-none" value={row.type} onChange={(e) => update({ type: e.target.value as FormField['type'] })}>
+                    <select
+                      className="h-7 w-full bg-transparent text-xs outline-none"
+                      value={row.type}
+                      onChange={(e) => update({ type: e.target.value as FormField['type'] })}
+                    >
                       <option value="text">Text</option>
                       <option value="file">File</option>
                     </select>
@@ -194,7 +217,9 @@ function BodyContent({ body, setBody }: { body: Body; setBody: (patch: Partial<B
       return (
         <div className="p-3">
           <FilePicker value={body.content} onChange={(content) => setBody({ content })} />
-          <p className="mt-2 text-[11px] text-muted">Paths relative to the workspace folder are shared with your team; absolute paths only work on your machine.</p>
+          <p className="mt-2 text-[11px] text-muted">
+            Paths relative to the workspace folder are shared with your team; absolute paths only work on your machine.
+          </p>
         </div>
       )
     case 'graphql':
@@ -221,7 +246,12 @@ function FilePicker({ value, onChange, compact }: { value: string; onChange: (va
   }
   return (
     <div className="flex items-center gap-1">
-      <Input className={compact ? 'h-7 border-0 bg-transparent text-xs' : ''} value={value} onChange={(e) => onChange(e.target.value)} placeholder="path/to/file" />
+      <Input
+        className={compact ? 'h-7 border-0 bg-transparent text-xs' : ''}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="path/to/file"
+      />
       <IconButton label="Browse" onClick={() => void browse()}>
         <FolderOpen className="size-3.5" />
       </IconButton>

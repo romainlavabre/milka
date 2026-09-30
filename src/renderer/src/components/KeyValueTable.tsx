@@ -67,7 +67,11 @@ export function KeyValueTable<T extends KeyValue>({
               </td>
               {extra && <td className="w-28 border-r border-border px-1">{extra(row, (patch) => update(index, patch))}</td>}
               <td className="w-8 text-center">
-                <IconButton label="Remove" className="size-6 opacity-0 group-hover:opacity-100" onClick={() => onChange(rows.filter((_, i) => i !== index))}>
+                <IconButton
+                  label="Remove"
+                  className="size-6 opacity-0 group-hover:opacity-100"
+                  onClick={() => onChange(rows.filter((_, i) => i !== index))}
+                >
                   <Trash2 className="size-3.5" />
                 </IconButton>
               </td>

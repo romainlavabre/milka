@@ -52,8 +52,8 @@ export function WorkspaceSwitcher() {
         <>
           The workspace is removed from the app, and the secrets saved for its environments are forgotten.
           <br />
-          Its local clone (<span className="font-mono text-xs">{repo.path}</span>) is deleted if the app created it; a folder you
-          opened yourself is kept. The remote repository is not touched.
+          Its local clone (<span className="font-mono text-xs">{repo.path}</span>) is deleted if the app created it; a folder you opened
+          yourself is kept. The remote repository is not touched.
         </>
       ),
       confirmLabel: 'Remove',

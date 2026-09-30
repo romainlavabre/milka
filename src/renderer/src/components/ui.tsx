@@ -78,10 +78,7 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
     <RadixTooltip.Root delayDuration={400}>
       <RadixTooltip.Trigger asChild>{children}</RadixTooltip.Trigger>
       <RadixTooltip.Portal>
-        <RadixTooltip.Content
-          sideOffset={4}
-          className="z-50 rounded bg-panel-2 px-2 py-1 text-xs text-fg shadow-lg border border-border"
-        >
+        <RadixTooltip.Content sideOffset={4} className="z-50 rounded bg-panel-2 px-2 py-1 text-xs text-fg shadow-lg border border-border">
           {content}
         </RadixTooltip.Content>
       </RadixTooltip.Portal>
@@ -92,10 +89,7 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
 const fieldClass =
   'w-full rounded-md border border-border bg-bg px-2 text-fg placeholder:text-muted/70 outline-none focus:border-accent disabled:opacity-60'
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input(
-  { className, ...props },
-  ref
-) {
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...props }, ref) {
   return <input ref={ref} className={cn(fieldClass, 'h-8', className)} spellCheck={false} {...props} />
 })
 
@@ -144,7 +138,17 @@ export function Checkbox({
   )
 }
 
-export function Field({ label, hint, children, className }: { label: ReactNode; hint?: ReactNode; children: ReactNode; className?: string }) {
+export function Field({
+  label,
+  hint,
+  children,
+  className
+}: {
+  label: ReactNode
+  hint?: ReactNode
+  children: ReactNode
+  className?: string
+}) {
   return (
     <label className={clsx('flex flex-col gap-1', className)}>
       <span className="text-xs font-medium text-muted">{label}</span>

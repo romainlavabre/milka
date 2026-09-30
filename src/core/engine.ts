@@ -11,7 +11,16 @@ import { basename, isAbsolute, resolve } from 'node:path'
 import { runAssertions } from './assert'
 import { FormData, send, type PreparedRequest, type RawResponse } from './http'
 import type { WorkspaceStore } from './layout/store'
-import { activeBody, DEFAULT_TIMEOUT_MS, type Auth, type Body, type Collection, type Folder, type HttpRequest, type KeyValue } from './model'
+import {
+  activeBody,
+  DEFAULT_TIMEOUT_MS,
+  type Auth,
+  type Body,
+  type Collection,
+  type Folder,
+  type HttpRequest,
+  type KeyValue
+} from './model'
 import type { ExecutionResult, Header, LogEntry, TestResult } from './results'
 import { evaluate, runScript, SkipSignal, type MilkaApi, type ScriptRequest, type ScriptResponse, type ScriptScope } from './script'
 
@@ -246,12 +255,26 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
   const request = options.request ?? store.readRequest(slug, path)
   const logs: LogEntry[] = []
   const tests: TestResult[] = []
-  const result: ExecutionResult = { name: request.name, path, request: null, response: null, error: null, skipped: null, logs, tests, durationMs: 0 }
+  const result: ExecutionResult = {
+    name: request.name,
+    path,
+    request: null,
+    response: null,
+    error: null,
+    skipped: null,
+    logs,
+    tests,
+    durationMs: 0
+  }
   const done = (): ExecutionResult => ({ ...result, durationMs: Math.round(performance.now() - started) })
 
   // Variables: request variables can use the lower scopes.
   const processEnv = options.processEnv ?? {}
-  const lower: VarMap[] = [...[...folders].reverse().map((f) => enabledVars(f.vars)), options.environment.vars, enabledVars(collection.vars)]
+  const lower: VarMap[] = [
+    ...[...folders].reverse().map((f) => enabledVars(f.vars)),
+    options.environment.vars,
+    enabledVars(collection.vars)
+  ]
   const lowerVars = new Variables(lower, processEnv)
   const requestVars: VarMap = {}
   for (const row of request.vars.pre) if (row.enabled && row.name) requestVars[row.name] = lowerVars.interpolate(row.value)
@@ -262,7 +285,13 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
   const req: ScriptRequest = {
     name: request.name,
     method: request.method,
-    url: withQuery(withPathParams(request.url, request.params.filter((p) => p.type === 'path')), request.params.filter((p) => p.type === 'query')),
+    url: withQuery(
+      withPathParams(
+        request.url,
+        request.params.filter((p) => p.type === 'path')
+      ),
+      request.params.filter((p) => p.type === 'query')
+    ),
     headers,
     body: scriptBody(body),
     bodyName: body?.name ?? null,
@@ -289,7 +318,8 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
       let specBody: string | undefined
       if (spec.body !== undefined) {
         specBody = typeof spec.body === 'string' ? vars.interpolate(spec.body) : JSON.stringify(spec.body)
-        if (typeof spec.body !== 'string' && !specHeaders.some(([n]) => n.toLowerCase() === 'content-type')) specHeaders.push(['Content-Type', 'application/json'])
+        if (typeof spec.body !== 'string' && !specHeaders.some(([n]) => n.toLowerCase() === 'content-type'))
+          specHeaders.push(['Content-Type', 'application/json'])
       }
       const raw = await send(
         {

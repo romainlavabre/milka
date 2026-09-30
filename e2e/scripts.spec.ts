@@ -23,7 +23,11 @@ test('completes the script API and reports tests', async () => {
 
   await page.getByRole('tab', { name: 'Tests' }).click()
   await page.locator('.monaco-editor').first().click()
-  await pasteCode(app, page, "test('is ok', () => expect(res.status).toBe(200))\ntest('has seen', () => expect(milka.vars.get('seen')).toBe('GET'))")
+  await pasteCode(
+    app,
+    page,
+    "test('is ok', () => expect(res.status).toBe(200))\ntest('has seen', () => expect(milka.vars.get('seen')).toBe('GET'))"
+  )
   // The paste lands asynchronously: wait for it before sending.
   await expect(page.locator('.monaco-editor').first()).toContainText('has seen')
   await page.keyboard.press('Control+Enter')

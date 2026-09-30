@@ -42,7 +42,8 @@ export function ResponsePanel({ result, running, onCancel }: { result: Execution
     return (
       <EmptyState icon={<Send className="size-8" />} title="No response yet">
         <p className="text-xs">
-          Send the request with <kbd className="rounded border border-border px-1">Ctrl</kbd> + <kbd className="rounded border border-border px-1">Enter</kbd>
+          Send the request with <kbd className="rounded border border-border px-1">Ctrl</kbd> +{' '}
+          <kbd className="rounded border border-border px-1">Enter</kbd>
         </p>
       </EmptyState>
     )
@@ -77,7 +78,10 @@ export function ResponsePanel({ result, running, onCancel }: { result: Execution
           <span className="font-medium text-danger">Not sent</span>
         )}
         {result.tests.length > 0 && (
-          <button className={clsx('ml-auto flex items-center gap-1', succeeded(result) ? 'text-success' : 'text-danger')} onClick={() => setTab('tests')}>
+          <button
+            className={clsx('ml-auto flex items-center gap-1', succeeded(result) ? 'text-success' : 'text-danger')}
+            onClick={() => setTab('tests')}
+          >
             {succeeded(result) ? <CheckCircle2 className="size-3.5" /> : <XCircle className="size-3.5" />}
             {passed}/{result.tests.length} passed
           </button>
@@ -120,7 +124,11 @@ function BodyView({ response }: { response: ReceivedResponse }) {
         </div>
       )
     }
-    return <EmptyState title="Binary response">{formatBytes(response.size)} of {response.contentType || 'unknown type'}</EmptyState>
+    return (
+      <EmptyState title="Binary response">
+        {formatBytes(response.size)} of {response.contentType || 'unknown type'}
+      </EmptyState>
+    )
   }
 
   return (
@@ -146,7 +154,12 @@ function BodyView({ response }: { response: ReceivedResponse }) {
         </IconButton>
       </div>
       <div className="min-h-0 flex-1">
-        <CodeEditor readOnly wordWrap={mode === 'raw'} language={mode === 'pretty' ? language : 'plaintext'} value={mode === 'pretty' ? pretty : response.body} />
+        <CodeEditor
+          readOnly
+          wordWrap={mode === 'raw'}
+          language={mode === 'pretty' ? language : 'plaintext'}
+          value={mode === 'pretty' ? pretty : response.body}
+        />
       </div>
     </div>
   )
@@ -198,7 +211,8 @@ function Timeline({ result }: { result: ExecutionResult }) {
             {response.status} {response.statusText}
           </div>
           <div className="text-muted">
-            First byte {formatDuration(response.timings.ttfb)}, complete {formatDuration(response.timings.total)}, {formatBytes(response.size)}
+            First byte {formatDuration(response.timings.ttfb)}, complete {formatDuration(response.timings.total)},{' '}
+            {formatBytes(response.size)}
           </div>
           {response.headers.map(([name, value], i) => (
             <div key={i}>
@@ -228,7 +242,11 @@ function TestsList({ result }: { result: ExecutionResult }) {
     <div className="selectable h-full overflow-auto p-2">
       {result.tests.map((test, i) => (
         <div key={i} className="flex items-start gap-2 rounded px-2 py-1.5 hover:bg-hover">
-          {test.passed ? <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" /> : <XCircle className="mt-0.5 size-3.5 shrink-0 text-danger" />}
+          {test.passed ? (
+            <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-success" />
+          ) : (
+            <XCircle className="mt-0.5 size-3.5 shrink-0 text-danger" />
+          )}
           <div className="min-w-0">
             <div className="text-xs">
               {test.name} <span className="text-[10px] text-muted">{test.kind}</span>

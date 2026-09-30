@@ -8,7 +8,15 @@ function diagnostics(script: string): string[] {
     '/milka.d.ts': SCRIPT_TYPINGS + variableTypings(['baseUrl', 'token']),
     '/script.ts': script
   }
-  const options: ts.CompilerOptions = { target: ts.ScriptTarget.ES2022, lib: ['lib.es2022.d.ts'], strict: false, noEmit: true, moduleDetection: ts.ModuleDetectionKind.Force, module: ts.ModuleKind.ESNext, types: [] }
+  const options: ts.CompilerOptions = {
+    target: ts.ScriptTarget.ES2022,
+    lib: ['lib.es2022.d.ts'],
+    strict: false,
+    noEmit: true,
+    moduleDetection: ts.ModuleDetectionKind.Force,
+    module: ts.ModuleKind.ESNext,
+    types: []
+  }
   const host = ts.createCompilerHost(options)
   const read = host.readFile.bind(host)
   host.readFile = (name) => files[name] ?? read(name)

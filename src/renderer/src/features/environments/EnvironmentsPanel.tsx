@@ -51,11 +51,23 @@ export function EnvironmentsPanel({ collection }: { collection: string }) {
   }, [environments, selected])
 
   const create = async (from?: string): Promise<void> => {
-    const name = await prompt({ title: from ? 'Duplicate environment' : 'New environment', label: 'Name', initial: from ? '' : 'Development', confirmLabel: 'Create' })
+    const name = await prompt({
+      title: from ? 'Duplicate environment' : 'New environment',
+      label: 'Name',
+      initial: from ? '' : 'Development',
+      confirmLabel: 'Create'
+    })
     if (!name?.trim()) return
     try {
-      const base = from ? await api.environments.get({ collection, env: from }) : { environment: newEnvironment(name.trim()), secretValues: {} }
-      const slug = await api.environments.save({ collection, env: null, data: { ...base.environment, name: name.trim() }, secretValues: base.secretValues })
+      const base = from
+        ? await api.environments.get({ collection, env: from })
+        : { environment: newEnvironment(name.trim()), secretValues: {} }
+      const slug = await api.environments.save({
+        collection,
+        env: null,
+        data: { ...base.environment, name: name.trim() },
+        secretValues: base.secretValues
+      })
       await queryClient.invalidateQueries({ queryKey: ['environments', collection] })
       setSelected(slug)
       // The first environment of a collection becomes the selected one.
@@ -80,7 +92,10 @@ export function EnvironmentsPanel({ collection }: { collection: string }) {
           {environments?.map((env) => (
             <button
               key={env.slug}
-              className={clsx('flex h-7 w-full items-center gap-2 rounded px-2 text-left text-xs hover:bg-hover', env.slug === selected && 'bg-hover text-fg')}
+              className={clsx(
+                'flex h-7 w-full items-center gap-2 rounded px-2 text-left text-xs hover:bg-hover',
+                env.slug === selected && 'bg-hover text-fg'
+              )}
               onClick={() => setSelected(env.slug)}
             >
               <Globe className="size-3.5 text-muted" />
@@ -97,12 +112,18 @@ export function EnvironmentsPanel({ collection }: { collection: string }) {
       </div>
       <div className="min-w-0 flex-1">
         {selected ? (
-          <EnvironmentEditor key={selected} collection={collection} env={selected} onDuplicate={() => void create(selected)} onRenamed={setSelected} />
+          <EnvironmentEditor
+            key={selected}
+            collection={collection}
+            env={selected}
+            onDuplicate={() => void create(selected)}
+            onRenamed={setSelected}
+          />
         ) : (
           <EmptyState icon={<Globe className="size-8" />} title="No environment">
             <p className="max-w-sm text-xs">
-              An environment holds the variables of a target (dev, staging, prod). Mark a variable secret to keep its value encrypted on your machine, out of
-              git.
+              An environment holds the variables of a target (dev, staging, prod). Mark a variable secret to keep its value encrypted on
+              your machine, out of git.
             </p>
             <Button variant="primary" icon={<Plus className="size-3.5" />} onClick={() => void create()}>
               New environment
@@ -114,9 +135,23 @@ export function EnvironmentsPanel({ collection }: { collection: string }) {
   )
 }
 
-function EnvironmentEditor({ collection, env, onDuplicate, onRenamed }: { collection: string; env: string; onDuplicate: () => void; onRenamed: (slug: string) => void }) {
+function EnvironmentEditor({
+  collection,
+  env,
+  onDuplicate,
+  onRenamed
+}: {
+  collection: string
+  env: string
+  onDuplicate: () => void
+  onRenamed: (slug: string) => void
+}) {
   const queryClient = useQueryClient()
-  const { data, error } = useQuery({ queryKey: ['environment', collection, env], queryFn: () => api.environments.get({ collection, env }), staleTime: Infinity })
+  const { data, error } = useQuery({
+    queryKey: ['environment', collection, env],
+    queryFn: () => api.environments.get({ collection, env }),
+    staleTime: Infinity
+  })
   const [name, setName] = useState('')
   const [rows, setRows] = useState<Row[]>([])
   const [baseline, setBaseline] = useState('')
@@ -159,7 +194,12 @@ function EnvironmentEditor({ collection, env, onDuplicate, onRenamed }: { collec
   useShortcut('s', () => void save(), dirty)
 
   const remove = async (): Promise<void> => {
-    const ok = await confirm({ title: `Delete environment "${name}"`, body: 'Its variables and the local secret values are deleted.', confirmLabel: 'Delete', danger: true })
+    const ok = await confirm({
+      title: `Delete environment "${name}"`,
+      body: 'Its variables and the local secret values are deleted.',
+      confirmLabel: 'Delete',
+      danger: true
+    })
     if (!ok) return
     try {
       await api.environments.remove({ collection, env })
@@ -186,20 +226,28 @@ function EnvironmentEditor({ collection, env, onDuplicate, onRenamed }: { collec
         <IconButton label="Delete environment" onClick={() => void remove()}>
           <Trash2 className="size-3.5" />
         </IconButton>
-        <Button variant={dirty ? 'primary' : 'secondary'} size="sm" icon={<Save className="size-3.5" />} loading={saving} disabled={!dirty} onClick={() => void save()}>
+        <Button
+          variant={dirty ? 'primary' : 'secondary'}
+          size="sm"
+          icon={<Save className="size-3.5" />}
+          loading={saving}
+          disabled={!dirty}
+          onClick={() => void save()}
+        >
           Save
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-3">
         {data.secretsUnreadable && (
           <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 p-2 text-xs text-danger">
-            The secret values saved on this machine cannot be decrypted (the system keyring changed). They are kept in case it comes back; type them again to replace
-            them.
+            The secret values saved on this machine cannot be decrypted (the system keyring changed). They are kept in case it comes back;
+            type them again to replace them.
           </div>
         )}
         <p className="mb-2 text-[11px] text-muted">
-          Use them as <code>{'{{name}}'}</code>. <Lock className="inline size-3" /> Secret values are encrypted on this machine and never committed: each teammate
-          types their own. In CI, pass them with <code>--env-var name=value</code> or a <code>MILKA_SECRET_NAME</code> variable.
+          Use them as <code>{'{{name}}'}</code>. <Lock className="inline size-3" /> Secret values are encrypted on this machine and never
+          committed: each teammate types their own. In CI, pass them with <code>--env-var name=value</code> or a{' '}
+          <code>MILKA_SECRET_NAME</code> variable.
         </p>
         <div className="selectable overflow-hidden rounded-md border border-border">
           <table className="w-full table-fixed border-collapse">
@@ -217,7 +265,12 @@ function EnvironmentEditor({ collection, env, onDuplicate, onRenamed }: { collec
                     />
                   </td>
                   <td className="border-r border-border">
-                    <input className={cell} value={row.name} placeholder="Variable" onChange={(e) => update(index, { name: e.target.value })} />
+                    <input
+                      className={cell}
+                      value={row.name}
+                      placeholder="Variable"
+                      onChange={(e) => update(index, { name: e.target.value })}
+                    />
                   </td>
                   <td className="border-r border-border">
                     <div className="flex items-center">
@@ -254,7 +307,11 @@ function EnvironmentEditor({ collection, env, onDuplicate, onRenamed }: { collec
                     </IconButton>
                   </td>
                   <td className="w-8 text-center">
-                    <IconButton label="Remove" className="size-6 opacity-0 group-hover:opacity-100" onClick={() => setRows(rows.filter((_, i) => i !== index))}>
+                    <IconButton
+                      label="Remove"
+                      className="size-6 opacity-0 group-hover:opacity-100"
+                      onClick={() => setRows(rows.filter((_, i) => i !== index))}
+                    >
                       <Trash2 className="size-3.5" />
                     </IconButton>
                   </td>

@@ -82,7 +82,13 @@ export function SettingsPanel<T extends Inheritable>({
       return (
         <div className="h-full p-3">
           <div className="h-full overflow-hidden rounded-md border border-border">
-            <CodeEditor language="markdown" wordWrap value={value.docs} onChange={(docs) => set({ docs })} placeholder="Markdown documentation" />
+            <CodeEditor
+              language="markdown"
+              wordWrap
+              value={value.docs}
+              onChange={(docs) => set({ docs })}
+              placeholder="Markdown documentation"
+            />
           </div>
         </div>
       )

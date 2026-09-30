@@ -11,15 +11,16 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build": "electron-vite build && vite build --config vite.cli.config.ts",
+    "build:cli": "vite build --config vite.cli.config.ts",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
-    "test:e2e": "electron-vite build && playwright test",
-    "dist": "electron-vite build && electron-builder --linux"
+    "test:e2e": "npm run build && playwright test",
+    "dist": "npm run build && electron-builder --linux"
   },
   "dependencies": {
     "simple-git": "^4.0.2",

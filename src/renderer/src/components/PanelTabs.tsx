@@ -32,7 +32,9 @@ export function PanelTabs<T extends string>({
             aria-selected={tab.id === value}
             className={clsx(
               'relative flex h-9 shrink-0 items-center gap-1 px-2.5 text-xs transition',
-              tab.id === value ? 'text-fg after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-accent' : 'text-muted hover:text-fg'
+              tab.id === value
+                ? 'text-fg after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:bg-accent'
+                : 'text-muted hover:text-fg'
             )}
             onClick={() => onChange(tab.id)}
           >

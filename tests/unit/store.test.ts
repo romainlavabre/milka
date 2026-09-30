@@ -45,7 +45,10 @@ describe('WorkspaceStore', () => {
 
   it('reads hand-written files leniently', () => {
     const { id: slug } = store.writeCollection(null, newCollection('API'))
-    writeFileSync(join(root, 'collections/api/ping.yaml'), 'name: Ping\nmethod: get\nurl: /ping\nheaders:\n  - name: X-Num\n    value: 42\n  - nonsense\n')
+    writeFileSync(
+      join(root, 'collections/api/ping.yaml'),
+      'name: Ping\nmethod: get\nurl: /ping\nheaders:\n  - name: X-Num\n    value: 42\n  - nonsense\n'
+    )
     const request = store.readRequest(slug, 'ping.yaml')
     expect(request).toMatchObject({ name: 'Ping', method: 'GET', url: '/ping', bodies: [], auth: { type: 'inherit' } })
     expect(request.headers).toEqual([{ name: 'X-Num', value: '42', enabled: true, description: '' }])

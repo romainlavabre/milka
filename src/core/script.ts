@@ -115,7 +115,11 @@ function sandbox(scope: ScriptScope, options: RunOptions, pendingTests: Promise<
   const test = (name: string, fn: () => unknown): void => {
     if (!options.tests) throw new Error('test() is only available in tests and post-response scripts')
     const record = (error?: unknown): void => {
-      options.tests!.push(error === undefined ? { name, passed: true, kind: 'test' } : { name, passed: false, error: (error as Error)?.message ?? String(error), kind: 'test' })
+      options.tests!.push(
+        error === undefined
+          ? { name, passed: true, kind: 'test' }
+          : { name, passed: false, error: (error as Error)?.message ?? String(error), kind: 'test' }
+      )
     }
     try {
       const result = fn()

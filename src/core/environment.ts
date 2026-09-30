@@ -8,7 +8,12 @@ import { enabledVars } from './vars'
 /** Prefix of process variables providing secret values in CI: MILKA_SECRET_TOKEN for `token`. */
 export const SECRET_ENV_PREFIX = 'MILKA_SECRET_'
 
-export function environmentValues(store: WorkspaceStore, collection: string, env: string | null, secretValues: Record<string, string>): EnvironmentValues {
+export function environmentValues(
+  store: WorkspaceStore,
+  collection: string,
+  env: string | null,
+  secretValues: Record<string, string>
+): EnvironmentValues {
   if (!env) return { name: null, vars: {} }
   const environment = store.readEnvironment(collection, env)
   const vars = enabledVars(environment.vars)

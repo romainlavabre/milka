@@ -57,6 +57,15 @@ export function useWorkspaceStatus(): void {
     [queryClient]
   )
 
+  useEffect(
+    () =>
+      onEvent('workspace:files', () => {
+        // Editors keep their unsaved changes: useDraft only takes new data when clean.
+        for (const queryKey of [...CONTENT_KEYS, ['variable-names']]) void queryClient.invalidateQueries({ queryKey })
+      }),
+    [queryClient]
+  )
+
   useEffect(() => {
     if (!activeRepoId) return
     void api.workspace.sync({ repoId: activeRepoId }).catch(() => undefined)

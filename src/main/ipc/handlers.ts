@@ -1,6 +1,6 @@
 // Implementation of the IPC API on top of the main-process services.
 import { app, dialog, type BrowserWindow } from 'electron'
-import type { Api } from '@shared/api'
+import type { Api, ApiEvents } from '@shared/api'
 import type { ExecutionService } from '../execution'
 import type { SettingsStore } from '../settings'
 import type { ContentService } from '../workspace/content'
@@ -13,9 +13,10 @@ export interface Services {
   settings: SettingsStore
   window(): BrowserWindow | null
   secretsEncrypted(): boolean
+  events: { runnerCase(payload: ApiEvents['runner:case']): void }
 }
 
-export function createHandlers({ workspace, content, execution, settings, window, secretsEncrypted }: Services): Api {
+export function createHandlers({ workspace, content, execution, settings, window, secretsEncrypted, events }: Services): Api {
   return {
     workspace: {
       async state() {
@@ -81,6 +82,12 @@ export function createHandlers({ workspace, content, execution, settings, window
       },
       async clearRuntimeVars() {
         execution.clearRuntimeVars()
+      }
+    },
+    runner: {
+      run: (args) => execution.run(args, (runCase, index, total) => events.runnerCase({ runId: args.runId, runCase, index, total })),
+      async cancel({ runId }) {
+        execution.cancel(runId)
       }
     },
     settings: {

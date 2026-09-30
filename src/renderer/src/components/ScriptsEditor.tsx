@@ -63,7 +63,17 @@ export function ScriptsEditor({
   )
 }
 
-export function TestsEditor({ value, onChange, scope, collection }: { value: string; onChange: (value: string) => void; scope: string; collection: string }) {
+export function TestsEditor({
+  value,
+  onChange,
+  scope,
+  collection
+}: {
+  value: string
+  onChange: (value: string) => void
+  scope: string
+  collection: string
+}) {
   useVariableTypings(collection)
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">

@@ -58,6 +58,33 @@ export interface ExecutionResult {
   durationMs: number
 }
 
+/** One request (and body) of a run. */
+export interface RunCase {
+  path: string
+  name: string
+  bodyName: string | null
+  passed: boolean
+  result: ExecutionResult
+}
+
+export interface RunSummary {
+  collection: string
+  collectionName: string
+  environment: string | null
+  startedAt: string
+  durationMs: number
+  cases: RunCase[]
+  passed: number
+  failed: number
+  skipped: number
+  testsPassed: number
+  testsFailed: number
+}
+
+export function caseLabel(runCase: Pick<RunCase, 'name' | 'bodyName'>): string {
+  return runCase.bodyName ? `${runCase.name} [${runCase.bodyName}]` : runCase.name
+}
+
 /** True when the request was sent (or skipped on purpose) and every assertion and test passed. */
 export function succeeded(result: ExecutionResult): boolean {
   return !result.error && (result.skipped !== null || (result.response !== null && result.tests.every((t) => t.passed)))

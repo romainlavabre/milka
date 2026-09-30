@@ -16,7 +16,12 @@ export interface Draft<T> {
   error: unknown
 }
 
-export function useDraft<T>(options: { queryKey: unknown[]; load: () => Promise<T>; save: (draft: T) => Promise<void>; tabId: string }): Draft<T> {
+export function useDraft<T>(options: {
+  queryKey: unknown[]
+  load: () => Promise<T>
+  save: (draft: T) => Promise<void>
+  tabId: string
+}): Draft<T> {
   const query = useQuery({ queryKey: options.queryKey, queryFn: options.load, staleTime: Infinity })
   const [draft, setDraftState] = useState<T | null>(null)
   const [saving, setSaving] = useState(false)

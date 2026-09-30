@@ -11,7 +11,10 @@ export function ColorPalette({ value, onChange }: { value: string; onChange: (co
           key={color}
           type="button"
           aria-label={`Color ${color}`}
-          className={clsx('flex size-6 items-center justify-center rounded-full ring-offset-2 ring-offset-panel-2', value === color && 'ring-2 ring-fg')}
+          className={clsx(
+            'flex size-6 items-center justify-center rounded-full ring-offset-2 ring-offset-panel-2',
+            value === color && 'ring-2 ring-fg'
+          )}
           style={{ background: color }}
           onClick={() => onChange(color)}
         >

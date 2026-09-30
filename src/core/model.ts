@@ -75,10 +75,7 @@ const authSchema = (fallback: AuthType) =>
     .catch({ type: fallback, username: '', password: '', token: '', key: '', value: '', in: 'header' })
 export type Auth = z.output<ReturnType<typeof authSchema>>
 
-const scriptsSchema = z
-  .object({ pre: text(), post: text() })
-  .default({ pre: '', post: '' })
-  .catch({ pre: '', post: '' })
+const scriptsSchema = z.object({ pre: text(), post: text() }).default({ pre: '', post: '' }).catch({ pre: '', post: '' })
 export type Scripts = z.output<typeof scriptsSchema>
 
 export const ASSERT_OPERATORS = [
@@ -165,7 +162,18 @@ export const folderSchema = z.object({
 })
 export type Folder = z.output<typeof folderSchema>
 
-export const COLLECTION_COLORS = ['#8b6cf0', '#3b82f6', '#06b6d4', '#10b981', '#84cc16', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#64748b']
+export const COLLECTION_COLORS = [
+  '#8b6cf0',
+  '#3b82f6',
+  '#06b6d4',
+  '#10b981',
+  '#84cc16',
+  '#f59e0b',
+  '#f97316',
+  '#ef4444',
+  '#ec4899',
+  '#64748b'
+]
 
 export const collectionSchema = z.object({
   name: z.string().min(1).catch('Untitled'),

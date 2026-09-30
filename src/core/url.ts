@@ -14,7 +14,9 @@ export function pathParamNames(url: string): string[] {
 
 /** The URL shown in the URL bar: stored URL plus the enabled query params. */
 export function displayUrl(url: string, params: Param[]): string {
-  const query = params.filter((p) => p.type === 'query' && p.enabled && p.name).map((p) => (p.value === '' ? p.name : `${p.name}=${p.value}`))
+  const query = params
+    .filter((p) => p.type === 'query' && p.enabled && p.name)
+    .map((p) => (p.value === '' ? p.name : `${p.name}=${p.value}`))
   return query.length ? `${url}?${query.join('&')}` : url
 }
 

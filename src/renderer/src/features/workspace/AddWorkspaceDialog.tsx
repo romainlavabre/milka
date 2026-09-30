@@ -87,8 +87,8 @@ export function AddWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOp
         }}
       >
         <p className="text-xs leading-relaxed text-muted">
-          A workspace is a git repository holding collections, requests and environments (without secret values). Use one per
-          client or team: there is no limit, and each one syncs with its own remote.
+          A workspace is a git repository holding collections, requests and environments (without secret values). Use one per client or
+          team: there is no limit, and each one syncs with its own remote.
         </p>
         <SegmentedControl<Mode>
           value={mode}

@@ -16,14 +16,30 @@ export function useResponse(tabId: string): ResponseState {
   return useResponses((s) => s[tabId]) ?? { result: null, running: false, requestId: null }
 }
 
-export async function sendRequest(args: { tabId: string; collection: string; path: string; request: HttpRequest; env: string | null }): Promise<void> {
+export async function sendRequest(args: {
+  tabId: string
+  collection: string
+  path: string
+  request: HttpRequest
+  env: string | null
+}): Promise<void> {
   const requestId = crypto.randomUUID()
   useResponses.setState((s) => ({ [args.tabId]: { result: s[args.tabId]?.result ?? null, running: true, requestId } }))
   let result: ExecutionResult
   try {
     result = await api.http.send({ requestId, collection: args.collection, path: args.path, request: args.request, env: args.env })
   } catch (error) {
-    result = { name: args.request.name, path: args.path, request: null, response: null, error: errorMessage(error), skipped: null, logs: [], tests: [], durationMs: 0 }
+    result = {
+      name: args.request.name,
+      path: args.path,
+      request: null,
+      response: null,
+      error: errorMessage(error),
+      skipped: null,
+      logs: [],
+      tests: [],
+      durationMs: 0
+    }
   }
   // Ignore the answer of a request cancelled or replaced in the meantime.
   if (useResponses.getState()[args.tabId]?.requestId !== requestId) return

@@ -93,7 +93,9 @@ export class WorkspaceStore {
   listCollections(): CollectionSummary[] {
     if (!existsSync(this.collectionsDir)) return []
     return readdirSync(this.collectionsDir, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory() && !entry.name.startsWith('.') && existsSync(join(this.collectionsDir, entry.name, COLLECTION_FILE)))
+      .filter(
+        (entry) => entry.isDirectory() && !entry.name.startsWith('.') && existsSync(join(this.collectionsDir, entry.name, COLLECTION_FILE))
+      )
       .map((entry) => {
         const collection = this.readCollection(entry.name)
         return { slug: entry.name, name: collection.name, color: collection.color, children: this.readTree(entry.name) }
@@ -196,7 +198,10 @@ export class WorkspaceStore {
     if (slugify(current.name) !== wanted && basename(path) !== wanted) {
       const parentPath = posix.dirname(path) === '.' ? '' : posix.dirname(path)
       const parentDir = dirname(this.nodePath(slug, path))
-      const name = uniqueSlug(wanted, (candidate) => (!parentPath && candidate === ENVIRONMENTS_DIR) || existsSync(join(parentDir, candidate)))
+      const name = uniqueSlug(
+        wanted,
+        (candidate) => (!parentPath && candidate === ENVIRONMENTS_DIR) || existsSync(join(parentDir, candidate))
+      )
       target = parentPath ? `${parentPath}/${name}` : name
       renameSync(this.nodePath(slug, path), this.nodePath(slug, target))
     }
@@ -280,8 +285,10 @@ export class WorkspaceStore {
       const extension = isFolder ? '' : EXTENSION
       const base = basename(from, extension)
       const name =
-        uniqueSlug(base, (candidate) => (!parent && isFolder && candidate === ENVIRONMENTS_DIR) || existsSync(join(parentDir, candidate + extension))) +
-        extension
+        uniqueSlug(
+          base,
+          (candidate) => (!parent && isFolder && candidate === ENVIRONMENTS_DIR) || existsSync(join(parentDir, candidate + extension))
+        ) + extension
       target = parent ? `${parent}/${name}` : name
       renameSync(source, this.nodePath(slug, target))
       paths.push(this.rel(source), this.rel(this.nodePath(slug, target)))

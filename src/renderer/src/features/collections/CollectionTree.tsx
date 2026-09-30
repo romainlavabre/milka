@@ -70,7 +70,9 @@ export function CollectionTree() {
         </IconButton>
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-4">
-        {collections?.map((collection) => <CollectionRow key={collection.slug} collection={collection} />)}
+        {collections?.map((collection) => (
+          <CollectionRow key={collection.slug} collection={collection} />
+        ))}
         {!isLoading && collections?.length === 0 && (
           <EmptyState title="No collection yet">
             <button className="text-xs text-accent hover:underline" onClick={() => void actions.newCollection()}>
@@ -89,13 +91,21 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
   const [dropping, setDropping] = useState(false)
 
   const setColor = (color: string): Promise<unknown> =>
-    actions.run(async () => api.collections.save({ collection: collection.slug, data: { ...(await api.collections.get({ collection: collection.slug })), color } }))
+    actions.run(async () =>
+      api.collections.save({
+        collection: collection.slug,
+        data: { ...(await api.collections.get({ collection: collection.slug })), color }
+      })
+    )
 
   const rename = async (): Promise<void> => {
     const name = await prompt({ title: 'Rename collection', label: 'Name', initial: collection.name, confirmLabel: 'Rename' })
     if (!name?.trim() || name.trim() === collection.name) return
     const slug = await actions.run(async () =>
-      api.collections.save({ collection: collection.slug, data: { ...(await api.collections.get({ collection: collection.slug })), name: name.trim() } })
+      api.collections.save({
+        collection: collection.slug,
+        data: { ...(await api.collections.get({ collection: collection.slug })), name: name.trim() }
+      })
     )
     if (slug && slug !== collection.slug) retargetTabs(collection.slug, '', '', slug)
   }
@@ -139,10 +149,16 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
         </ContextMenu.Trigger>
         <ContextMenu.Portal>
           <ContextMenu.Content className={menuContentClass}>
-            <MenuItem icon={<FilePlus className="size-3.5" />} onSelect={() => void actions.newRequest(collection.slug, '', () => setOpen(true))}>
+            <MenuItem
+              icon={<FilePlus className="size-3.5" />}
+              onSelect={() => void actions.newRequest(collection.slug, '', () => setOpen(true))}
+            >
               New request
             </MenuItem>
-            <MenuItem icon={<FolderPlus className="size-3.5" />} onSelect={() => void actions.newFolder(collection.slug, '', () => setOpen(true))}>
+            <MenuItem
+              icon={<FolderPlus className="size-3.5" />}
+              onSelect={() => void actions.newFolder(collection.slug, '', () => setOpen(true))}
+            >
               New folder
             </MenuItem>
             <MenuItem icon={<Play className="size-3.5" />} onSelect={() => openTab('runner', collection.slug)}>
@@ -208,8 +224,18 @@ function NodeRow({ collection, node }: { collection: CollectionSummary; node: Tr
     const parent = parentOf(node.path)
     const path = await actions.run(async () =>
       node.kind === 'request'
-        ? api.collections.saveRequest({ collection: slug, parent, path: node.path, data: { ...(await api.collections.getRequest({ collection: slug, path: node.path })), name: name.trim() } })
-        : api.collections.saveFolder({ collection: slug, parent, path: node.path, data: { ...(await api.collections.getFolder({ collection: slug, path: node.path })), name: name.trim() } })
+        ? api.collections.saveRequest({
+            collection: slug,
+            parent,
+            path: node.path,
+            data: { ...(await api.collections.getRequest({ collection: slug, path: node.path })), name: name.trim() }
+          })
+        : api.collections.saveFolder({
+            collection: slug,
+            parent,
+            path: node.path,
+            data: { ...(await api.collections.getFolder({ collection: slug, path: node.path })), name: name.trim() }
+          })
     )
     if (path && path !== node.path) retargetTabs(slug, node.path, path)
   }
@@ -224,7 +250,9 @@ function NodeRow({ collection, node }: { collection: CollectionSummary; node: Tr
     if (!ok) return
     closeTabsUnder(slug, node.path)
     await actions.run(() =>
-      node.kind === 'request' ? api.collections.removeRequest({ collection: slug, path: node.path }) : api.collections.removeFolder({ collection: slug, path: node.path })
+      node.kind === 'request'
+        ? api.collections.removeRequest({ collection: slug, path: node.path })
+        : api.collections.removeFolder({ collection: slug, path: node.path })
     )
   }
 
@@ -268,10 +296,16 @@ function NodeRow({ collection, node }: { collection: CollectionSummary; node: Tr
           <ContextMenu.Content className={menuContentClass}>
             {node.kind === 'folder' ? (
               <>
-                <MenuItem icon={<FilePlus className="size-3.5" />} onSelect={() => void actions.newRequest(slug, node.path, () => setOpen(true))}>
+                <MenuItem
+                  icon={<FilePlus className="size-3.5" />}
+                  onSelect={() => void actions.newRequest(slug, node.path, () => setOpen(true))}
+                >
                   New request
                 </MenuItem>
-                <MenuItem icon={<FolderPlus className="size-3.5" />} onSelect={() => void actions.newFolder(slug, node.path, () => setOpen(true))}>
+                <MenuItem
+                  icon={<FolderPlus className="size-3.5" />}
+                  onSelect={() => void actions.newFolder(slug, node.path, () => setOpen(true))}
+                >
                   New folder
                 </MenuItem>
                 <MenuItem icon={<Play className="size-3.5" />} onSelect={() => openTab('runner', slug, node.path)}>

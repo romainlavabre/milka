@@ -22,7 +22,10 @@ function body(value: Body): unknown {
     type: value.type,
     content: value.type === 'form' || value.type === 'multipart' || value.type === 'none' ? undefined : value.content,
     variables: value.type === 'graphql' ? value.variables : undefined,
-    fields: value.type === 'form' || value.type === 'multipart' ? value.fields.map((f) => ({ ...f, type: f.type === 'text' ? undefined : f.type })) : undefined
+    fields:
+      value.type === 'form' || value.type === 'multipart'
+        ? value.fields.map((f) => ({ ...f, type: f.type === 'text' ? undefined : f.type }))
+        : undefined
   }
 }
 

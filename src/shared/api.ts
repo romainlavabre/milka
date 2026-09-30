@@ -3,7 +3,7 @@
 // Every method takes a single object argument (validated with zod in main) and
 // is exposed on channel `${domain}:${method}`.
 import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '../core/model'
-import type { ExecutionResult } from '../core/results'
+import type { ExecutionResult, RunCase, RunSummary } from '../core/results'
 import type { AppSettings, ConflictChoice, EnvironmentDraft, SyncStatus, WorkspaceRepo, WorkspaceState } from './types'
 
 export interface AppInfo {
@@ -67,6 +67,19 @@ export interface Api {
     runtimeVars(): Promise<Record<string, string>>
     clearRuntimeVars(): Promise<void>
   }
+  runner: {
+    /** Runs requests and their tests; cases are pushed with `runner:case` as they complete. */
+    run(args: {
+      runId: string
+      collection: string
+      path: string
+      env: string | null
+      allBodies: boolean
+      bail: boolean
+      tags: string[]
+    }): Promise<RunSummary>
+    cancel(args: { runId: string }): Promise<void>
+  }
   settings: {
     get(): Promise<AppSettings>
     set(args: Partial<AppSettings>): Promise<AppSettings>
@@ -84,9 +97,12 @@ export interface Api {
 export interface ApiEvents {
   'workspace:status': SyncStatus
   'workspace:changed': WorkspaceState
+  /** Files of the active workspace changed outside the app (MCP server, editor, git). */
+  'workspace:files': { repoId: string }
+  'runner:case': { runId: string; runCase: RunCase; index: number; total: number }
 }
 
-export const API_EVENTS: (keyof ApiEvents)[] = ['workspace:status', 'workspace:changed']
+export const API_EVENTS: (keyof ApiEvents)[] = ['workspace:status', 'workspace:changed', 'workspace:files', 'runner:case']
 
 /** Method names per domain, used by the preload script to build the bridge. */
 export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
@@ -108,6 +124,7 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
   ],
   environments: ['list', 'get', 'save', 'remove'],
   http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars'],
+  runner: ['run', 'cancel'],
   settings: ['get', 'set'],
   dialog: ['openDirectory', 'openFile'],
   app: ['info']

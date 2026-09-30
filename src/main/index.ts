@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu, safeStorage, shell } from 'electron'
 import type { ZodType } from 'zod'
 import { API_METHODS, type Api, type ApiEvents } from '@shared/api'
+import { COMMANDS, runCli } from '../cli/index'
 import { createHandlers } from './ipc/handlers'
 import { schemas } from './ipc/schemas'
 import { ExecutionService } from './execution'
@@ -10,6 +11,8 @@ import { SecretStore, createCipher } from './secrets'
 import { SettingsStore } from './settings'
 import { ContentService } from './workspace/content'
 import { WorkspaceManager } from './workspace/manager'
+import { WorkspaceWatcher } from './workspace/watcher'
+import type { WorkspaceState } from '@shared/types'
 
 // Keeps the data folder name stable (~/.config/milka) whatever the product name.
 app.setName('milka')
@@ -90,7 +93,9 @@ function registerIpc(api: Api): void {
         if (!isTrustedSender(event.senderFrame?.url)) throw new Error('Untrusted sender')
         const parsed = schema.safeParse(arg)
         if (!parsed.success) {
-          throw new Error(`Invalid request for ${channel}: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`)
+          throw new Error(
+            `Invalid request for ${channel}: ${parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ')}`
+          )
         }
         return handler(parsed.data)
       })
@@ -98,20 +103,58 @@ function registerIpc(api: Api): void {
   }
 }
 
-void app.whenReady().then(() => {
+function startApp(): void {
+  void app.whenReady().then(ready)
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit()
+  })
+}
+
+/** `milka run …` and the other commands run in the terminal, without window. */
+function startCli(args: string[]): void {
+  void runCli(args, {
+    stdout: (text) => process.stdout.write(text),
+    stderr: (text) => process.stderr.write(text),
+    cwd: process.cwd(),
+    env: process.env,
+    color: !!process.stdout.isTTY && !process.env.NO_COLOR,
+    version: app.getVersion()
+  }).then((code) => app.exit(code))
+}
+
+function ready(): void {
   Menu.setApplicationMenu(null)
   const dataDir = app.getPath('userData')
   const secrets = new SecretStore(join(dataDir, 'secrets.json'), createCipher(safeStorage, join(dataDir, 'secrets.key')))
+  const watcher = new WorkspaceWatcher((repoId) => send('workspace:files', { repoId }))
+  const watchActive = (state: WorkspaceState): void => {
+    const active = state.repos.find((r) => r.id === state.activeRepoId)
+    watcher.watch(active?.id ?? null, active?.path ?? null)
+  }
   const workspace = new WorkspaceManager(join(dataDir, 'workspaces.json'), join(dataDir, 'workspaces'), secrets, {
     status: (status) => send('workspace:status', status),
-    changed: (state) => send('workspace:changed', state)
+    changed: (state) => {
+      watchActive(state)
+      send('workspace:changed', state)
+    }
   })
+  watchActive(workspace.state())
 
   const content = new ContentService(workspace, secrets)
   const settings = new SettingsStore(join(dataDir, 'settings.json'))
   const execution = new ExecutionService(workspace, content, settings)
 
-  registerIpc(createHandlers({ workspace, content, execution, settings, window: () => mainWindow, secretsEncrypted }))
+  registerIpc(
+    createHandlers({
+      workspace,
+      content,
+      execution,
+      settings,
+      window: () => mainWindow,
+      secretsEncrypted,
+      events: { runnerCase: (payload) => send('runner:case', payload) }
+    })
+  )
   createWindow()
 
   let quitting = false
@@ -127,8 +170,9 @@ void app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
-})
+}
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+// The packaged binary gets its arguments first; `electron .` in development after the app folder.
+const args = process.argv.slice(app.isPackaged ? 1 : 2).filter((arg) => !arg.startsWith('--no-sandbox'))
+if (args.length > 0 && COMMANDS.includes(args[0])) startCli(args)
+else startApp()

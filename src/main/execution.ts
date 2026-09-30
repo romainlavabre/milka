@@ -3,6 +3,8 @@
 import { executeRequest, type ExecutionResult } from '@core/engine'
 import { environmentValues } from '@core/environment'
 import type { HttpRequest } from '@core/model'
+import type { RunCase, RunSummary } from '@core/results'
+import { runCollection } from '@core/runner'
 import type { VarMap } from '@core/vars'
 import type { ContentService } from './workspace/content'
 import type { WorkspaceManager } from './workspace/manager'
@@ -65,5 +67,33 @@ export class ExecutionService {
 
   cancel(requestId: string): void {
     this.running.get(requestId)?.abort()
+  }
+
+  /** Runs a collection, folder or request with its tests; each case is reported as it completes. */
+  async run(
+    args: { runId: string; collection: string; path: string; env: string | null; allBodies: boolean; bail: boolean; tags: string[] },
+    onCase: (runCase: RunCase, index: number, total: number) => void
+  ): Promise<RunSummary> {
+    const store = this.content.store()
+    const controller = new AbortController()
+    this.running.set(args.runId, controller)
+    try {
+      const secrets = args.env ? this.content.secretValues(args.collection, args.env) : {}
+      return await runCollection({
+        store,
+        collection: args.collection,
+        path: args.path,
+        environment: environmentValues(store, args.collection, args.env, secrets),
+        processEnv: process.env,
+        insecure: this.settings.read().insecureTls,
+        allBodies: args.allBodies,
+        bail: args.bail,
+        tags: args.tags,
+        signal: controller.signal,
+        onCase
+      })
+    } finally {
+      this.running.delete(args.runId)
+    }
   }
 }

@@ -101,8 +101,8 @@ function ConflictDialog({
     >
       <div className="flex flex-col gap-3">
         <p className="text-xs text-muted">
-          These files were changed both here and on the remote. Choose which version to keep for each one. Your local version is
-          untouched until you resolve.
+          These files were changed both here and on the remote. Choose which version to keep for each one. Your local version is untouched
+          until you resolve.
         </p>
         {files.map((file) => (
           <div key={file} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">

@@ -59,6 +59,18 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     runtimeVars: none,
     clearRuntimeVars: none
   },
+  runner: {
+    run: z.object({
+      runId: z.string().min(1),
+      collection,
+      path: z.string(),
+      env: env.nullable(),
+      allBodies: z.boolean(),
+      bail: z.boolean(),
+      tags: z.array(z.string())
+    }),
+    cancel: z.object({ runId: z.string() })
+  },
   settings: {
     get: none,
     set: z.object({ insecureTls: z.boolean().optional() })

@@ -73,7 +73,12 @@ describe('executeRequest', () => {
     const echo = JSON.parse(result.response!.body)
     // Folder variables win over the environment, which wins over the collection.
     expect(echo.path).toBe('/echo/folder?q=a%20b')
-    expect(echo.headers).toMatchObject({ 'x-collection': 'c', 'x-level': 'request', authorization: 'Bearer env-token', 'user-agent': 'Milka' })
+    expect(echo.headers).toMatchObject({
+      'x-collection': 'c',
+      'x-level': 'request',
+      authorization: 'Bearer env-token',
+      'user-agent': 'Milka'
+    })
   })
 
   it('sends the active body or the one asked for', async () => {
@@ -132,7 +137,9 @@ describe('executeRequest', () => {
     expect(result.error).toBe('pre-request (request) (line 2): undefinedFn is not defined')
     expect(result.request).toBeNull()
 
-    const skipped = await executeRequest(broken.options({ request: newRequest('Skip', { scripts: { pre: "milka.skip('not today')", post: '' } }) }))
+    const skipped = await executeRequest(
+      broken.options({ request: newRequest('Skip', { scripts: { pre: "milka.skip('not today')", post: '' } }) })
+    )
     expect(skipped).toMatchObject({ skipped: 'not today', error: null, request: null })
   })
 
@@ -148,7 +155,11 @@ describe('executeRequest', () => {
     expect(redirected.response?.redirects).toHaveLength(1)
     expect(JSON.parse(redirected.response!.body).path).toBe('/echo?redirected=1')
 
-    const slow = await executeRequest(options({ request: newRequest('Slow', { url: '{{baseUrl}}/slow', settings: { timeout: 200, followRedirects: true, maxRedirects: 5 } }) }))
+    const slow = await executeRequest(
+      options({
+        request: newRequest('Slow', { url: '{{baseUrl}}/slow', settings: { timeout: 200, followRedirects: true, maxRedirects: 5 } })
+      })
+    )
     expect(slow.error).toBe('Request timed out after 200 ms')
 
     const refused = await executeRequest(options({ request: newRequest('Down', { url: 'http://127.0.0.1:1/x' }) }))
@@ -156,7 +167,13 @@ describe('executeRequest', () => {
   })
 
   it('encodes forms and resolves built-in variables', async () => {
-    const body = { ...newBody('Form', 'form'), fields: [{ ...kv('a', '{{$timestamp}}'), type: 'text' as const }, { ...kv('b', 'x y'), type: 'text' as const }] }
+    const body = {
+      ...newBody('Form', 'form'),
+      fields: [
+        { ...kv('a', '{{$timestamp}}'), type: 'text' as const },
+        { ...kv('b', 'x y'), type: 'text' as const }
+      ]
+    }
     const { options } = setup(newRequest('Form', { method: 'POST', url: '{{baseUrl}}/echo', bodies: [body] }))
     const result = await executeRequest(options({ processEnv: { HOME_DIR: '/home/x' } }))
     const echo = JSON.parse(result.response!.body)

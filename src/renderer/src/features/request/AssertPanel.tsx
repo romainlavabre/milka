@@ -12,7 +12,8 @@ function valueText(value: unknown): string {
 }
 
 export function AssertPanel({ assertions, onChange }: { assertions: Assertion[]; onChange: (assertions: Assertion[]) => void }) {
-  const update = (index: number, patch: Partial<Assertion>): void => onChange(assertions.map((a, i) => (i === index ? { ...a, ...patch } : a)))
+  const update = (index: number, patch: Partial<Assertion>): void =>
+    onChange(assertions.map((a, i) => (i === index ? { ...a, ...patch } : a)))
   const add = (patch: Partial<Assertion>): void => onChange([...assertions, { expr: '', op: 'eq', value: '', enabled: true, ...patch }])
 
   return (
@@ -36,10 +37,19 @@ export function AssertPanel({ assertions, onChange }: { assertions: Assertion[];
                   />
                 </td>
                 <td className="border-r border-border">
-                  <input className={cell} value={assertion.expr} placeholder="res.status" onChange={(e) => update(index, { expr: e.target.value })} />
+                  <input
+                    className={cell}
+                    value={assertion.expr}
+                    placeholder="res.status"
+                    onChange={(e) => update(index, { expr: e.target.value })}
+                  />
                 </td>
                 <td className="w-40 border-r border-border">
-                  <select className="h-7 w-full bg-transparent px-1 text-xs outline-none" value={assertion.op} onChange={(e) => update(index, { op: e.target.value as AssertOperator })}>
+                  <select
+                    className="h-7 w-full bg-transparent px-1 text-xs outline-none"
+                    value={assertion.op}
+                    onChange={(e) => update(index, { op: e.target.value as AssertOperator })}
+                  >
                     {ASSERT_OPERATORS.map((op) => (
                       <option key={op} value={op}>
                         {OPERATOR_LABELS[op]}
@@ -58,7 +68,11 @@ export function AssertPanel({ assertions, onChange }: { assertions: Assertion[];
                   )}
                 </td>
                 <td className="w-8 text-center">
-                  <IconButton label="Remove" className="size-6 opacity-0 group-hover:opacity-100" onClick={() => onChange(assertions.filter((_, i) => i !== index))}>
+                  <IconButton
+                    label="Remove"
+                    className="size-6 opacity-0 group-hover:opacity-100"
+                    onClick={() => onChange(assertions.filter((_, i) => i !== index))}
+                  >
                     <Trash2 className="size-3.5" />
                   </IconButton>
                 </td>
@@ -67,7 +81,12 @@ export function AssertPanel({ assertions, onChange }: { assertions: Assertion[];
             <tr>
               <td className="w-8 border-r border-border" />
               <td className="border-r border-border">
-                <input className={cell} value="" placeholder={assertions.length ? 'Add…' : 'res.status'} onChange={(e) => add({ expr: e.target.value })} />
+                <input
+                  className={cell}
+                  value=""
+                  placeholder={assertions.length ? 'Add…' : 'res.status'}
+                  onChange={(e) => add({ expr: e.target.value })}
+                />
               </td>
               <td className="w-40 border-r border-border" />
               <td className="border-r border-border" />

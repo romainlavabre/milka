@@ -19,6 +19,9 @@
   "include": [
     "electron.vite.config.ts",
     "vitest.config.ts",
+    "vite.cli.config.ts",
+    "src/cli/**/*",
+    "src/mcp/**/*",
     "playwright.config.ts",
     "src/main/**/*",
     "src/preload/**/*",

@@ -26,11 +26,20 @@ describe('ContentService', () => {
     const alice = content('alice')
     await alice.ws.clone('Team', remote)
     const slug = await alice.content.saveCollection(null, newCollection('Users API', '#ef4444'))
-    await alice.content.saveRequest(slug, '', null, newRequest('Create user', { method: 'POST', bodies: [newBody('Valid'), newBody('Empty')] }))
+    await alice.content.saveRequest(
+      slug,
+      '',
+      null,
+      newRequest('Create user', { method: 'POST', bodies: [newBody('Valid'), newBody('Empty')] })
+    )
     await alice.content.saveEnvironment(
       slug,
       null,
-      { ...newEnvironment('Prod'), vars: [{ name: 'baseUrl', value: 'https://api.acme.io', enabled: true, description: '' }], secrets: ['token'] },
+      {
+        ...newEnvironment('Prod'),
+        vars: [{ name: 'baseUrl', value: 'https://api.acme.io', enabled: true, description: '' }],
+        secrets: ['token']
+      },
       { token: 'sup3r-s3cret' }
     )
     await alice.ws.flush()
@@ -58,7 +67,12 @@ describe('ContentService', () => {
     const env = await alice.content.saveEnvironment(slug, null, { ...newEnvironment('Dev'), secrets: ['token'] }, { token: 't' })
     const renamed = await alice.content.saveCollection(slug, { ...alice.content.getCollection(slug), name: 'Billing' })
     expect(renamed).toBe('billing')
-    const envRenamed = await alice.content.saveEnvironment(renamed, env, { ...alice.content.getEnvironment(renamed, env).environment, name: 'Local' }, { token: 't' })
+    const envRenamed = await alice.content.saveEnvironment(
+      renamed,
+      env,
+      { ...alice.content.getEnvironment(renamed, env).environment, name: 'Local' },
+      { token: 't' }
+    )
     expect(alice.content.getEnvironment(renamed, envRenamed).secretValues).toEqual({ token: 't' })
     // A variable no longer secret loses its local value.
     await alice.content.saveEnvironment(renamed, envRenamed, { ...newEnvironment('Local'), secrets: [] }, { token: 't' })

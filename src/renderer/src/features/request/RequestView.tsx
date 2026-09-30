@@ -58,7 +58,12 @@ export function RequestView({ collection, path }: { collection: string; path: st
   const enabled = (rows: KeyValue[]): number => rows.filter((r) => r.enabled && r.name).length
   const tabs = [
     { id: 'params' as const, label: 'Params', count: enabled(draft.params) },
-    { id: 'body' as const, label: draft.bodies.length > 1 ? `Bodies` : 'Body', count: draft.bodies.length > 1 ? draft.bodies.length : 0, marked: draft.bodies.length === 1 },
+    {
+      id: 'body' as const,
+      label: draft.bodies.length > 1 ? `Bodies` : 'Body',
+      count: draft.bodies.length > 1 ? draft.bodies.length : 0,
+      marked: draft.bodies.length === 1
+    },
     { id: 'headers' as const, label: 'Headers', count: enabled(draft.headers) },
     { id: 'auth' as const, label: 'Auth', marked: draft.auth.type !== 'inherit' },
     { id: 'vars' as const, label: 'Vars', count: enabled(draft.vars.pre) + enabled(draft.vars.post) },
@@ -111,7 +116,13 @@ export function RequestView({ collection, path }: { collection: string; path: st
           <div className="flex h-full min-h-0 flex-col">
             <PanelTabs tabs={tabs} value={tab} onChange={setTab} />
             <div className="min-h-0 flex-1">
-              <RequestTabContent tab={tab} request={draft} onChange={setDraft} collection={collection} scope={`request/${collection}/${path}`} />
+              <RequestTabContent
+                tab={tab}
+                request={draft}
+                onChange={setDraft}
+                collection={collection}
+                scope={`request/${collection}/${path}`}
+              />
             </div>
           </div>
         </Panel>
@@ -183,8 +194,15 @@ function RequestTabContent({
       return (
         <Padded>
           <div className="mb-1 text-[11px] font-medium text-muted">Before the request — may use other variables</div>
-          <KeyValueTable rows={request.vars.pre} onChange={(pre) => set({ vars: { ...request.vars, pre } })} create={keyValue} namePlaceholder="Variable" />
-          <div className="mb-1 mt-4 text-[11px] font-medium text-muted">From the response — the value is an expression, kept for the next requests</div>
+          <KeyValueTable
+            rows={request.vars.pre}
+            onChange={(pre) => set({ vars: { ...request.vars, pre } })}
+            create={keyValue}
+            namePlaceholder="Variable"
+          />
+          <div className="mb-1 mt-4 text-[11px] font-medium text-muted">
+            From the response — the value is an expression, kept for the next requests
+          </div>
           <KeyValueTable
             rows={request.vars.post}
             onChange={(post) => set({ vars: { ...request.vars, post } })}
@@ -209,7 +227,15 @@ function RequestTabContent({
         </div>
       )
     case 'docs':
-      return <CodeEditor language="markdown" wordWrap value={request.docs} onChange={(docs) => set({ docs })} placeholder="Markdown documentation" />
+      return (
+        <CodeEditor
+          language="markdown"
+          wordWrap
+          value={request.docs}
+          onChange={(docs) => set({ docs })}
+          placeholder="Markdown documentation"
+        />
+      )
     case 'settings':
       return (
         <Padded>

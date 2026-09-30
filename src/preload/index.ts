@@ -5,9 +5,7 @@ import { API_EVENTS, API_METHODS, type Api, type Bridge } from '../shared/api'
 const api = Object.fromEntries(
   Object.entries(API_METHODS).map(([domain, methods]) => [
     domain,
-    Object.fromEntries(
-      (methods as string[]).map((method) => [method, (arg?: unknown) => ipcRenderer.invoke(`${domain}:${method}`, arg)])
-    )
+    Object.fromEntries((methods as string[]).map((method) => [method, (arg?: unknown) => ipcRenderer.invoke(`${domain}:${method}`, arg)]))
   ])
 ) as unknown as Api
 

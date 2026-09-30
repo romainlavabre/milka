@@ -38,7 +38,8 @@ export function deepEqual(a: unknown, b: unknown): boolean {
 function propertyAt(value: unknown, path: string): { found: boolean; value: unknown } {
   let current = value
   for (const part of path.split('.')) {
-    if (current === null || current === undefined || !Object.prototype.hasOwnProperty.call(Object(current), part)) return { found: false, value: undefined }
+    if (current === null || current === undefined || !Object.prototype.hasOwnProperty.call(Object(current), part))
+      return { found: false, value: undefined }
     current = (current as Record<string, unknown>)[part]
   }
   return { found: true, value: current }
@@ -101,6 +102,10 @@ function matchers(actual: unknown, negated: boolean): Matchers {
       else check(found.found && deepEqual(found.value, rest[0]), `to have property ${path} = ${show(rest[0])}`)
     },
     toBeTypeOf: (type) => check(typeOf(actual) === type, `to be of type ${type}`),
-    toBeOneOf: (values) => check(values.some((v) => deepEqual(v, actual)), `to be one of ${show(values)}`)
+    toBeOneOf: (values) =>
+      check(
+        values.some((v) => deepEqual(v, actual)),
+        `to be one of ${show(values)}`
+      )
   }
 }
