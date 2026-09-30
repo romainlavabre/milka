@@ -135,7 +135,7 @@ scripts of a `package.json`: only open workspaces you trust.
 
 Cookies work as in a browser: the ones a response sets (redirects included) are sent back to the requests they match,
 by domain, path, expiry and `Secure`. The app keeps them per workspace until it quits, never on disk; the cookie button
-of the request bar lists them and deletes them. A run, `milka run` and each MCP session start with an empty jar.
+of the sidebar or of the request bar lists them and deletes them. A run, `milka run` and each MCP session start with an empty jar.
 
 To refresh an expired token carried by a cookie, let the post-response script of the `Token` request store it:
 

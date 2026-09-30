@@ -11,11 +11,12 @@ function expiry(cookie: CookieInfo): string {
   return cookie.expires ? new Date(cookie.expires).toLocaleString() : 'Session'
 }
 
-export function CookiesButton() {
+/** Opens the cookies of the workspace, from the request bar or the sidebar. */
+export function CookiesButton({ className }: { className?: string }) {
   const [open, setOpen] = useState(false)
   return (
     <>
-      <IconButton label="Cookies" className="size-8" onClick={() => setOpen(true)}>
+      <IconButton label="Cookies" className={className} onClick={() => setOpen(true)}>
         <Cookie className="size-4" />
       </IconButton>
       <Dialog open={open} onOpenChange={setOpen} title="Cookies" width={760}>

@@ -30,6 +30,7 @@ import { confirm, prompt, toast } from '../../components/feedback'
 import { EmptyState, IconButton } from '../../components/ui'
 import { closeTabsUnder, openTab, retargetTabs, tabId, togglePin, useApp, useIsPinned, usePins } from '../../store'
 import { askUnsaved, draftsUnder } from '../layout/UnsavedChanges'
+import { CookiesButton } from '../request/CookiesButton'
 import { menuContentClass, menuItemClass } from '../workspace/WorkspaceSwitcher'
 import { ImportDialog } from './ImportDialog'
 import { findNode, methodColor, parentOf, useCollections, useRefreshContent } from './useCollections'
@@ -88,6 +89,7 @@ export function CollectionTree() {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-0.5 px-3 pb-1 pt-2">
         <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted">Collections</span>
+        <CookiesButton />
         <IconButton label="Import (Bruno, Postman, OpenAPI, cURL)" onClick={() => setImporting(true)}>
           <Download className="size-4" />
         </IconButton>

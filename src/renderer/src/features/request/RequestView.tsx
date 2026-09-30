@@ -105,7 +105,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
           placeholder="{{baseUrl}}/users/:id"
           onChange={(e) => set(applyTypedUrl(e.target.value, draft.params))}
         />
-        <CookiesButton />
+        <CookiesButton className="size-8" />
         <EnvironmentSelect collection={collection} />
         {response.running ? (
           <Button variant="secondary" icon={<Square className="size-3.5" />} onClick={() => cancelRequest(id)}>
