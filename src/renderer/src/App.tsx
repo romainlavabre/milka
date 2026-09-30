@@ -7,6 +7,7 @@ import { DialogHost, Toaster } from './components/feedback'
 import { Button, EmptyState } from './components/ui'
 import { CollectionTree } from './features/collections/CollectionTree'
 import { MainArea } from './features/layout/MainArea'
+import { UpdateBadge, UpdateNotice } from './features/update/UpdateNotice'
 import { AddWorkspaceDialog } from './features/workspace/AddWorkspaceDialog'
 import { WorkspaceSwitcher } from './features/workspace/WorkspaceSwitcher'
 import { useActiveRepo, useWorkspaceStatus } from './features/workspace/useWorkspace'
@@ -21,7 +22,8 @@ export function App() {
         <Panel defaultSize="22" minSize={240} maxSize="45">
           <aside className="flex h-full flex-col bg-panel">
             <WorkspaceSwitcher />
-            {repo && <CollectionTree />}
+            {repo ? <CollectionTree /> : <div className="flex-1" />}
+            <UpdateBadge />
           </aside>
         </Panel>
         <Separator className="resize-handle w-px" />
@@ -29,6 +31,7 @@ export function App() {
           <main className="h-full min-w-0">{repo ? <MainArea /> : <Welcome />}</main>
         </Panel>
       </Group>
+      <UpdateNotice />
       <Toaster />
       <DialogHost />
     </RadixTooltip.Provider>

@@ -4,7 +4,7 @@
 // is exposed on channel `${domain}:${method}`.
 import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '../core/model'
 import type { ExecutionResult, RunCase, RunSummary } from '../core/results'
-import type { AppSettings, ConflictChoice, EnvironmentDraft, SyncStatus, WorkspaceRepo, WorkspaceState } from './types'
+import type { AppSettings, ConflictChoice, EnvironmentDraft, SyncStatus, UpdateStatus, WorkspaceRepo, WorkspaceState } from './types'
 
 export interface AppInfo {
   version: string
@@ -108,6 +108,14 @@ export interface Api {
   app: {
     info(): Promise<AppInfo>
   }
+  update: {
+    status(): Promise<UpdateStatus>
+    /** Downloads and installs the latest version (a system window asks for the password of a .deb). */
+    install(): Promise<void>
+    /** Opens a terminal ready to run install.sh; `copied` when there was none and the command went to the clipboard. */
+    openTerminal(): Promise<{ command: string; copied: boolean }>
+    restart(): Promise<void>
+  }
 }
 
 /** Events pushed from the main process. */
@@ -117,9 +125,10 @@ export interface ApiEvents {
   /** Files of the active workspace changed outside the app (MCP server, editor, git). */
   'workspace:files': { repoId: string }
   'runner:case': { runId: string; runCase: RunCase; index: number; total: number }
+  'update:status': UpdateStatus
 }
 
-export const API_EVENTS: (keyof ApiEvents)[] = ['workspace:status', 'workspace:changed', 'workspace:files', 'runner:case']
+export const API_EVENTS: (keyof ApiEvents)[] = ['workspace:status', 'workspace:changed', 'workspace:files', 'runner:case', 'update:status']
 
 /** Method names per domain, used by the preload script to build the bridge. */
 export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
@@ -146,7 +155,8 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
   runner: ['run', 'cancel'],
   settings: ['get', 'set'],
   dialog: ['openDirectory', 'openFile', 'saveFile'],
-  app: ['info']
+  app: ['info'],
+  update: ['status', 'install', 'openTerminal', 'restart']
 }
 
 export interface Bridge {

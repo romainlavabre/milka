@@ -1,8 +1,9 @@
 // Implementation of the IPC API on top of the main-process services.
-import { app, dialog, type BrowserWindow } from 'electron'
+import { app, clipboard, dialog, type BrowserWindow } from 'electron'
 import type { Api, ApiEvents } from '@shared/api'
 import type { ExecutionService } from '../execution'
 import type { SettingsStore } from '../settings'
+import { updateCommand, type Updater } from '../update'
 import type { ContentService } from '../workspace/content'
 import type { WorkspaceManager } from '../workspace/manager'
 
@@ -11,12 +12,13 @@ export interface Services {
   content: ContentService
   execution: ExecutionService
   settings: SettingsStore
+  updater: Updater
   window(): BrowserWindow | null
   secretsEncrypted(): boolean
   events: { runnerCase(payload: ApiEvents['runner:case']): void }
 }
 
-export function createHandlers({ workspace, content, execution, settings, window, secretsEncrypted, events }: Services): Api {
+export function createHandlers({ workspace, content, execution, settings, updater, window, secretsEncrypted, events }: Services): Api {
   return {
     workspace: {
       async state() {
@@ -134,6 +136,20 @@ export function createHandlers({ workspace, content, execution, settings, window
     app: {
       async info() {
         return { version: app.getVersion(), platform: process.platform, secretsEncrypted: secretsEncrypted() }
+      }
+    },
+    update: {
+      status: async () => updater.getStatus(),
+      install: () => updater.install(),
+      async openTerminal() {
+        const command = updateCommand(updater.getStatus().kind)
+        if (await updater.openTerminal()) return { command, copied: false }
+        clipboard.writeText(command)
+        return { command, copied: true }
+      },
+      async restart() {
+        app.relaunch({ execPath: updater.relaunchPath(), args: process.argv.slice(1) })
+        app.quit()
       }
     }
   }

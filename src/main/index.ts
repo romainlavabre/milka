@@ -9,6 +9,7 @@ import { schemas } from './ipc/schemas'
 import { ExecutionService } from './execution'
 import { SecretStore, createCipher } from './secrets'
 import { SettingsStore } from './settings'
+import { Updater } from './update'
 import { JsonStore } from './jsonStore'
 import { ContentService, secretScope } from './workspace/content'
 import { WorkspaceManager } from './workspace/manager'
@@ -160,6 +161,12 @@ function ready(): void {
   const content = new ContentService(workspace, secrets)
   const settings = new SettingsStore(join(dataDir, 'settings.json'))
   const execution = new ExecutionService(workspace, content, settings)
+  const updater = new Updater({
+    version: app.getVersion(),
+    enabled: app.isPackaged && app.getVersion() !== '0.0.0',
+    installScript: join(process.resourcesPath, 'install.sh'),
+    emit: (status) => send('update:status', status)
+  })
 
   registerIpc(
     createHandlers({
@@ -167,12 +174,14 @@ function ready(): void {
       content,
       execution,
       settings,
+      updater,
       window: () => mainWindow,
       secretsEncrypted,
       events: { runnerCase: (payload) => send('runner:case', payload) }
     })
   )
   createWindow()
+  updater.start()
 
   let quitting = false
   app.on('before-quit', (event) => {

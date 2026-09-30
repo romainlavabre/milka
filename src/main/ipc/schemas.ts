@@ -96,5 +96,11 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
   },
   app: {
     info: none
+  },
+  update: {
+    status: none,
+    install: none,
+    openTerminal: none,
+    restart: none
   }
 }

@@ -22,6 +22,9 @@ Debian and Ubuntu get the `.deb` package (menu entry and `milka` command); other
 in `~/.local/share/milka`. `./install.sh --help` lists the options (a given version, a downloaded file, `--from-source`,
 `--uninstall`).
 
+Milka then updates itself: when a new release is out, a card offers to install it (the `.deb` asks for your password in
+a system window) and to restart.
+
 ## Workspaces
 
 A workspace is a git repository. Create one, clone the repository of your team, or open a folder, from the workspace
