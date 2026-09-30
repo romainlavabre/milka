@@ -87,3 +87,13 @@ select,
 *::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* Resize handles of react-resizable-panels. */
+.resize-handle {
+  background: var(--border);
+  transition: background 0.15s;
+}
+.resize-handle:hover,
+.resize-handle[data-separator='active'] {
+  background: var(--accent);
+}

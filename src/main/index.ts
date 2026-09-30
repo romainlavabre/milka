@@ -1,10 +1,12 @@
 // Electron entry point: window, IPC registration and services.
 import { join } from 'node:path'
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, safeStorage, shell } from 'electron'
 import type { ZodType } from 'zod'
-import { API_METHODS, type Api } from '@shared/api'
+import { API_METHODS, type Api, type ApiEvents } from '@shared/api'
 import { createHandlers } from './ipc/handlers'
 import { schemas } from './ipc/schemas'
+import { SecretStore, createCipher } from './secrets'
+import { WorkspaceManager } from './workspace/manager'
 
 // Keeps the data folder name stable (~/.config/milka) whatever the product name.
 app.setName('milka')
@@ -20,6 +22,16 @@ if (process.env.SNAP_NAME && !(process.env.SNAP && process.execPath.startsWith(p
 }
 
 let mainWindow: BrowserWindow | null = null
+
+function send<E extends keyof ApiEvents>(event: E, payload: ApiEvents[E]): void {
+  mainWindow?.webContents.send(event, payload)
+}
+
+function secretsEncrypted(): boolean {
+  if (!safeStorage.isEncryptionAvailable()) return false
+  // On Linux without a keyring, Electron falls back to a hard-coded key.
+  return process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'
+}
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -85,8 +97,25 @@ function registerIpc(api: Api): void {
 
 void app.whenReady().then(() => {
   Menu.setApplicationMenu(null)
-  registerIpc(createHandlers())
+  const dataDir = app.getPath('userData')
+  const secrets = new SecretStore(join(dataDir, 'secrets.json'), createCipher(safeStorage, join(dataDir, 'secrets.key')))
+  const workspace = new WorkspaceManager(join(dataDir, 'workspaces.json'), join(dataDir, 'workspaces'), secrets, {
+    status: (status) => send('workspace:status', status),
+    changed: (state) => send('workspace:changed', state)
+  })
+
+  registerIpc(createHandlers({ workspace, window: () => mainWindow, secretsEncrypted }))
   createWindow()
+
+  let quitting = false
+  app.on('before-quit', (event) => {
+    if (quitting) return
+    event.preventDefault()
+    quitting = true
+    // Push pending workspace changes before leaving.
+    const timeout = new Promise((resolve) => setTimeout(resolve, 5000))
+    void Promise.race([workspace.flush(), timeout]).finally(() => app.quit())
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
