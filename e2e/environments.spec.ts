@@ -26,11 +26,32 @@ test('sends requests with environment variables and local secrets', async () => 
   expect(file).toContain('secrets:\n  - token')
   expect(file).not.toContain('s3cr3t-value')
 
+  // Dragging the secret above the variable keeps that order, although they are stored apart.
+  const rows = page.locator('tbody tr')
+  await page
+    .getByRole('button', { name: 'Drag to reorder' })
+    .nth(1)
+    .dragTo(rows.first(), { targetPosition: { x: 60, y: 3 } })
+  await expect(rows.first().locator('input').nth(1)).toHaveValue('token')
+  await page.getByRole('button', { name: 'Save', exact: true }).last().click()
+  await expect
+    .poll(() => readFileSync(join(root, 'data/workspaces/acme/collections/echo/environments/local.yaml'), 'utf8'))
+    .toContain('order:\n  - token\n  - baseUrl')
+
   await createRequest(page, 'Echo', 'Whoami')
   await page.getByLabel('URL', { exact: true }).fill('{{baseUrl}}/echo')
   await page.getByRole('tab', { name: 'Headers' }).click()
-  await page.getByPlaceholder('Header').fill('X-Token')
-  await page.getByPlaceholder('Value').first().fill('{{token}}')
+  await page.getByPlaceholder('Header').fill('X-Other')
+  await page.getByPlaceholder('Add…').fill('X-Token')
+  await page.getByPlaceholder('Value').nth(1).fill('{{token}}')
+  // Headers move the same way, from the grip of the row.
+  const headers = page.locator('tbody tr:visible')
+  await page
+    .locator('[aria-label="Drag to reorder"]:visible')
+    .nth(1)
+    .dragTo(headers.first(), { targetPosition: { x: 60, y: 3 } })
+  await expect(headers.first().locator('input').nth(1)).toHaveValue('X-Token')
+  await expect(headers.nth(1).locator('input').nth(1)).toHaveValue('X-Other')
   await page.getByLabel('Environment').selectOption({ label: 'Local' })
   await page.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(page.getByText('200 OK')).toBeVisible()

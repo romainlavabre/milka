@@ -90,6 +90,9 @@ Mark an environment variable as secret with its lock: the environment file keeps
 the value, stored encrypted with the system keyring (a local key file when there is no keyring) in
 `~/.config/milka/secrets.json`.
 
+Drag the grip at the start of a row to reorder variables, secrets, params, headers, form fields and assertions. As an
+environment file lists its variables and its secrets apart, it records an `order` when you mix them.
+
 ## Scripts and tests
 
 Scripts are TypeScript. The editor completes and documents the API:

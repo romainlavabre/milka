@@ -1,8 +1,9 @@
 // Editable table of name / value rows (params, headers, variables, form fields).
-// A blank row at the bottom adds new entries as you type.
+// A blank row at the bottom adds new entries as you type; the grip of a row moves it.
 import { Trash2 } from 'lucide-react'
 import type { ReactNode } from 'react'
 import type { KeyValue } from '@core/model'
+import { useRowReorder } from './reorder'
 import { IconButton } from './ui'
 
 export function KeyValueTable<T extends KeyValue>({
@@ -12,7 +13,8 @@ export function KeyValueTable<T extends KeyValue>({
   namePlaceholder = 'Name',
   valuePlaceholder = 'Value',
   extra,
-  valueCell
+  valueCell,
+  reorderable = true
 }: {
   rows: T[]
   onChange: (rows: T[]) => void
@@ -24,8 +26,11 @@ export function KeyValueTable<T extends KeyValue>({
   extra?: (row: T, update: (patch: Partial<T>) => void) => ReactNode
   /** Replaces the value input (e.g. a file picker). */
   valueCell?: (row: T, update: (patch: Partial<T>) => void) => ReactNode
+  /** False when the order is not the user's (path params follow the URL). */
+  reorderable?: boolean
 }) {
   const update = (index: number, patch: Partial<T>): void => onChange(rows.map((row, i) => (i === index ? { ...row, ...patch } : row)))
+  const reorder = useRowReorder(rows, onChange)
   const cell = 'h-7 w-full bg-transparent px-2 font-mono text-xs outline-none placeholder:text-muted/60 focus:bg-panel-2'
 
   return (
@@ -33,7 +38,8 @@ export function KeyValueTable<T extends KeyValue>({
       <table className="w-full table-fixed border-collapse">
         <tbody>
           {rows.map((row, index) => (
-            <tr key={index} className="group border-b border-border last:border-b-0">
+            <tr key={index} className="group border-b border-border last:border-b-0" {...(reorderable ? reorder.rowProps(index) : {})}>
+              {reorderable && <td className="w-5">{reorder.handle(index)}</td>}
               <td className="w-8 border-r border-border text-center">
                 <input
                   type="checkbox"
@@ -78,6 +84,7 @@ export function KeyValueTable<T extends KeyValue>({
             </tr>
           ))}
           <tr>
+            {reorderable && <td className="w-5" />}
             <td className="w-8 border-r border-border" />
             <td className="border-r border-border">
               <input

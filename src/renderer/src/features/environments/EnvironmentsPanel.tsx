@@ -9,6 +9,7 @@ import type { EnvironmentDraft } from '@shared/types'
 import { api, errorMessage } from '../../lib/bridge'
 import { useShortcut } from '../../lib/shortcuts'
 import { confirm, prompt, toast } from '../../components/feedback'
+import { useRowReorder } from '../../components/reorder'
 import { Button, EmptyState, IconButton, Input, Spinner } from '../../components/ui'
 import { selectEnvironment, setDirty, tabId } from '../../store'
 import { useActiveRepo } from '../workspace/useWorkspace'
@@ -24,7 +25,13 @@ interface Row {
 function toRows(draft: EnvironmentDraft): Row[] {
   const rows: Row[] = draft.environment.vars.map((v) => ({ name: v.name, value: v.value, enabled: v.enabled, secret: false }))
   for (const name of draft.environment.secrets) rows.push({ name, value: draft.secretValues[name] ?? '', enabled: true, secret: true })
+  // Variables and secrets are stored apart: the order the user chose puts them back together.
+  const { order } = draft.environment
+  const position = (row: Row): number => (order.includes(row.name) ? order.indexOf(row.name) : order.length)
   return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => position(a.row) - position(b.row) || a.index - b.index)
+    .map((r) => r.row)
 }
 
 function fromRows(name: string, rows: Row[]): { data: Environment; secretValues: Record<string, string> } {
@@ -33,7 +40,8 @@ function fromRows(name: string, rows: Row[]): { data: Environment; secretValues:
     data: {
       name,
       vars: named.filter((r) => !r.secret).map((r) => ({ name: r.name.trim(), value: r.value, enabled: r.enabled, description: '' })),
-      secrets: named.filter((r) => r.secret).map((r) => r.name.trim())
+      secrets: named.filter((r) => r.secret).map((r) => r.name.trim()),
+      order: named.map((r) => r.name.trim())
     },
     secretValues: Object.fromEntries(named.filter((r) => r.secret).map((r) => [r.name.trim(), r.value]))
   }
@@ -230,6 +238,12 @@ function EnvironmentEditor({
     }
   }
 
+  // Revealed secrets are tracked by row index: moving rows hides them again.
+  const reorder = useRowReorder(rows, (next) => {
+    setRows(next)
+    setRevealed(new Set())
+  })
+
   if (error) return <div className="p-3 text-danger">{String(error)}</div>
   if (!data) return <Spinner className="m-4" />
 
@@ -274,7 +288,8 @@ function EnvironmentEditor({
           <table className="w-full table-fixed border-collapse">
             <tbody>
               {rows.map((row, index) => (
-                <tr key={index} className="group border-b border-border last:border-b-0">
+                <tr key={index} className="group border-b border-border last:border-b-0" {...reorder.rowProps(index)}>
+                  <td className="w-5">{reorder.handle(index)}</td>
                   <td className="w-8 border-r border-border text-center">
                     <input
                       type="checkbox"
@@ -339,6 +354,7 @@ function EnvironmentEditor({
                 </tr>
               ))}
               <tr>
+                <td className="w-5" />
                 <td className="w-8 border-r border-border" />
                 <td className="border-r border-border">
                   <input

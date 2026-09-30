@@ -196,7 +196,9 @@ export const environmentSchema = z.object({
   /** Shared values, committed. */
   vars: list(keyValueSchema),
   /** Names of the secret variables: their values stay encrypted on each machine. */
-  secrets: list(z.string())
+  secrets: list(z.string()),
+  /** Display order of the variable and secret names, when it is not the variables then the secrets. */
+  order: list(z.string())
 })
 export type Environment = z.output<typeof environmentSchema>
 

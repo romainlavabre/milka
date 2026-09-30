@@ -2,6 +2,7 @@
 import { Trash2 } from 'lucide-react'
 import { ASSERT_OPERATORS, type Assertion, type AssertOperator } from '@core/model'
 import { OPERATOR_LABELS, UNARY_OPERATORS } from '@core/assert-labels'
+import { useRowReorder } from '../../components/reorder'
 import { IconButton } from '../../components/ui'
 
 const cell = 'h-7 w-full bg-transparent px-2 font-mono text-xs outline-none placeholder:text-muted/60 focus:bg-panel-2'
@@ -15,6 +16,7 @@ export function AssertPanel({ assertions, onChange }: { assertions: Assertion[];
   const update = (index: number, patch: Partial<Assertion>): void =>
     onChange(assertions.map((a, i) => (i === index ? { ...a, ...patch } : a)))
   const add = (patch: Partial<Assertion>): void => onChange([...assertions, { expr: '', op: 'eq', value: '', enabled: true, ...patch }])
+  const reorder = useRowReorder(assertions, onChange)
 
   return (
     <div className="h-full overflow-auto p-3">
@@ -26,7 +28,8 @@ export function AssertPanel({ assertions, onChange }: { assertions: Assertion[];
         <table className="w-full table-fixed border-collapse">
           <tbody>
             {assertions.map((assertion, index) => (
-              <tr key={index} className="group border-b border-border last:border-b-0">
+              <tr key={index} className="group border-b border-border last:border-b-0" {...reorder.rowProps(index)}>
+                <td className="w-5">{reorder.handle(index)}</td>
                 <td className="w-8 border-r border-border text-center">
                   <input
                     type="checkbox"
@@ -79,6 +82,7 @@ export function AssertPanel({ assertions, onChange }: { assertions: Assertion[];
               </tr>
             ))}
             <tr>
+              <td className="w-5" />
               <td className="w-8 border-r border-border" />
               <td className="border-r border-border">
                 <input

@@ -112,4 +112,21 @@ describe('WorkspaceStore', () => {
     expect(store.listEnvironments('public-api')).toEqual([{ slug: 'dev', name: 'Dev' }])
     expect(store.listCollections().map((c) => c.slug)).toEqual(['public-api'])
   })
+
+  it('keeps the order of variables and secrets only when the user changed it', () => {
+    const { id: slug } = store.writeCollection(null, newCollection('API'))
+    const base = {
+      ...newEnvironment('Dev'),
+      vars: [
+        { name: 'baseUrl', value: 'http://localhost', enabled: true, description: '' },
+        { name: 'user', value: 'ada', enabled: true, description: '' }
+      ],
+      secrets: ['token']
+    }
+    store.writeEnvironment(slug, null, { ...base, order: ['baseUrl', 'user', 'token'] })
+    expect(readFileSync(join(root, 'collections/api/environments/dev.yaml'), 'utf8')).not.toContain('order')
+    // A name that no longer exists is dropped.
+    store.writeEnvironment(slug, 'dev', { ...base, order: ['token', 'gone', 'baseUrl', 'user'] })
+    expect(store.readEnvironment(slug, 'dev').order).toEqual(['token', 'baseUrl', 'user'])
+  })
 })

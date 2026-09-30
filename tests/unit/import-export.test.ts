@@ -60,7 +60,8 @@ describe('Bruno import', () => {
     expect(store.readEnvironment('shop-api', 'local')).toEqual({
       name: 'Local',
       vars: [{ name: 'baseUrl', value: 'http://localhost:3000', enabled: true, description: '' }],
-      secrets: ['token']
+      secrets: ['token'],
+      order: []
     })
   })
 
@@ -116,7 +117,8 @@ describe('Bruno import', () => {
     expect(store.readEnvironment('shop-api', 'local')).toEqual({
       name: 'Local',
       vars: [{ name: 'baseUrl', value: 'http://localhost:3000', enabled: true, description: '' }],
-      secrets: ['token']
+      secrets: ['token'],
+      order: []
     })
   })
 
@@ -160,7 +162,8 @@ describe('Postman import', () => {
     expect(env).toEqual({
       name: 'Prod',
       vars: [{ name: 'baseUrl', value: 'https://x', enabled: true, description: '' }],
-      secrets: ['token']
+      secrets: ['token'],
+      order: []
     })
   })
 })

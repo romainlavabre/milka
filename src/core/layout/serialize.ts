@@ -85,5 +85,9 @@ export function collectionToFile(collection: Collection): unknown {
 }
 
 export function environmentToFile(environment: Environment): unknown {
-  return prune({ name: environment.name, vars: environment.vars, secrets: environment.secrets })
+  const names = [...environment.vars.map((v) => v.name), ...environment.secrets]
+  // Only an order the user chose is written: the default one is implied.
+  const order = environment.order.filter((name) => names.includes(name))
+  const chosen = order.length > 0 && order.some((name, i) => name !== names[i])
+  return prune({ name: environment.name, vars: environment.vars, secrets: environment.secrets, order: chosen ? order : undefined })
 }

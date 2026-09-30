@@ -170,6 +170,7 @@ function RequestTabContent({
                 onChange={(rows) => set({ params: [...syncPathParams(request.url, rows), ...query] })}
                 create={(patch) => ({ ...keyValue(patch), type: 'path' })}
                 namePlaceholder="Parameter"
+                reorderable={false}
               />
             </>
           )}
