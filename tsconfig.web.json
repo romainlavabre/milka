@@ -28,6 +28,7 @@
     "src/core/url.ts",
     "src/core/assert-labels.ts",
     "src/core/script-typings.ts",
+    "src/core/tree-search.ts",
     "src/preload/*.d.ts"
   ]
 }

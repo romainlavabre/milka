@@ -1,5 +1,5 @@
 // Sidebar tree of the collections of the active workspace: folders and
-// requests, context menus, colors and drag and drop reordering.
+// requests, context menus, colors, search and drag and drop reordering.
 import * as ContextMenu from '@radix-ui/react-context-menu'
 import clsx from 'clsx'
 import {
@@ -13,13 +13,16 @@ import {
   Pencil,
   Play,
   Plus,
+  Search,
   Settings,
   Terminal,
   Trash2,
-  Upload
+  Upload,
+  X
 } from 'lucide-react'
 import { useState, type DragEvent, type ReactNode } from 'react'
 import { COLLECTION_COLORS, newCollection, newFolder, newRequest, type CollectionSummary, type TreeNode } from '@core/model'
+import { countRequests, highlightRanges, searchTree, searchWords } from '@core/tree-search'
 import { api, errorMessage } from '../../lib/bridge'
 import { confirm, prompt, toast } from '../../components/feedback'
 import { EmptyState, IconButton } from '../../components/ui'
@@ -112,6 +115,19 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
   const actions = useActions()
   const [dropping, setDropping] = useState(false)
   const [importingCurl, setImportingCurl] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [query, setQuery] = useState('')
+  const words = searchWords(query)
+  const nodes = searchTree(collection.children, words)
+
+  const startSearch = (): void => {
+    setSearching(true)
+    setOpen(true)
+  }
+  const stopSearch = (): void => {
+    setSearching(false)
+    setQuery('')
+  }
 
   const exportOpenApi = async (): Promise<void> => {
     const file = await api.dialog.saveFile({
@@ -176,6 +192,17 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
             <span className="size-2.5 shrink-0 rounded-full" style={{ background: collection.color }} />
             <span className="min-w-0 flex-1 truncate font-medium">{collection.name}</span>
             <IconButton
+              label={`Search in ${collection.name}`}
+              className={clsx('size-6', !searching && 'opacity-0 group-hover:opacity-100')}
+              onClick={(e) => {
+                e.stopPropagation()
+                if (searching) stopSearch()
+                else startSearch()
+              }}
+            >
+              <Search className="size-3.5" />
+            </IconButton>
+            <IconButton
               label="Collection settings"
               className="size-6 opacity-0 group-hover:opacity-100"
               onClick={(e) => {
@@ -203,6 +230,9 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
             </MenuItem>
             <MenuItem icon={<Terminal className="size-3.5" />} onSelect={() => setImportingCurl(true)}>
               New request from cURL
+            </MenuItem>
+            <MenuItem icon={<Search className="size-3.5" />} onSelect={startSearch}>
+              Search…
             </MenuItem>
             <MenuItem icon={<Play className="size-3.5" />} onSelect={() => openTab('runner', collection.slug)}>
               Run collection
@@ -246,10 +276,37 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
         </ContextMenu.Portal>
       </ContextMenu.Root>
       <ImportDialog open={importingCurl} onOpenChange={setImportingCurl} initial="curl" collection={collection.slug} />
+      {open && searching && (
+        <div className="ml-2 py-1 pl-1">
+          <div className="flex h-7 items-center gap-1.5 rounded-md border border-border bg-bg px-2 focus-within:border-accent">
+            <Search className="size-3.5 shrink-0 text-muted" />
+            <input
+              autoFocus
+              aria-label={`Search folders and requests of ${collection.name}`}
+              placeholder="Folder or request"
+              spellCheck={false}
+              className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted/60"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Escape' && stopSearch()}
+            />
+            <button className="rounded p-0.5 text-muted hover:bg-hover hover:text-fg" aria-label="Close search" onClick={stopSearch}>
+              <X className="size-3" />
+            </button>
+          </div>
+          {words.length > 0 && (
+            <div className="px-1 pt-1 text-[11px] text-muted">
+              {nodes.length === 0
+                ? 'No folder or request matches'
+                : `${countRequests(nodes)} request${countRequests(nodes) === 1 ? '' : 's'}`}
+            </div>
+          )}
+        </div>
+      )}
       {open && (
         <div className="ml-2 border-l border-border/60 pl-1">
-          {collection.children.map((node) => (
-            <NodeRow key={node.path} collection={collection} node={node} />
+          {nodes.map((node) => (
+            <NodeRow key={node.path} collection={collection} node={node} search={words.length > 0 ? words : undefined} />
           ))}
         </div>
       )}
@@ -257,8 +314,29 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
   )
 }
 
-function NodeRow({ collection, node }: { collection: CollectionSummary; node: TreeNode }) {
-  const [open, setOpen] = useState(false)
+/** A name with the searched words highlighted. */
+function Highlighted({ text, words }: { text: string; words?: string[] }) {
+  const ranges = words ? highlightRanges(text, words) : []
+  if (ranges.length === 0) return <>{text}</>
+  const parts: ReactNode[] = []
+  let at = 0
+  for (const [start, end] of ranges) {
+    if (start > at) parts.push(text.slice(at, start))
+    parts.push(
+      <mark key={start} className="rounded-sm bg-accent/30 text-fg">
+        {text.slice(start, end)}
+      </mark>
+    )
+    at = end
+  }
+  parts.push(text.slice(at))
+  return <>{parts}</>
+}
+
+/** A folder or request; `search` shows the searched words, with every folder open. */
+function NodeRow({ collection, node, search }: { collection: CollectionSummary; node: TreeNode; search?: string[] }) {
+  const [openState, setOpen] = useState(false)
+  const open = openState || !!search
   const [dropping, setDropping] = useState(false)
   const actions = useActions()
   const activeTabId = useApp((s) => s.activeTabId)
@@ -332,7 +410,9 @@ function NodeRow({ collection, node }: { collection: CollectionSummary; node: Tr
           {node.method.length > 6 ? node.method.slice(0, 5) : node.method}
         </span>
       )}
-      <span className="min-w-0 flex-1 truncate">{node.name}</span>
+      <span className="min-w-0 flex-1 truncate">
+        <Highlighted text={node.name} words={search} />
+      </span>
     </div>
   )
 
@@ -389,7 +469,7 @@ function NodeRow({ collection, node }: { collection: CollectionSummary; node: Tr
       {node.kind === 'folder' && open && (
         <div className="ml-3 border-l border-border/60 pl-1">
           {node.children.map((child) => (
-            <NodeRow key={child.path} collection={collection} node={child} />
+            <NodeRow key={child.path} collection={collection} node={child} search={search} />
           ))}
           {node.children.length === 0 && <div className="px-2 py-1 text-[11px] text-muted">Empty folder</div>}
         </div>
