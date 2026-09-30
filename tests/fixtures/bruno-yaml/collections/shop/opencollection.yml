@@ -1,0 +1,25 @@
+opencollection: 1.0.0
+
+info:
+  name: API
+request:
+  headers:
+    - name: X-Client
+      value: milka-tests
+  auth:
+    type: bearer
+    token: "{{token}}"
+  scripts:
+    - type: before-request
+      code: |-
+        req.setHeader("X-Request-Id", String(Date.now()));
+docs:
+  content: The shop API.
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git
+      - drafts

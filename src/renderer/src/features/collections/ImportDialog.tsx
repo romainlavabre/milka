@@ -11,7 +11,7 @@ type Source = 'bruno' | 'postman' | 'openapi' | 'curl'
 
 const HINTS: Record<Source, string> = {
   bruno:
-    'The folder of a Bruno collection (with its bruno.json). Folders, requests, environments, assertions and scripts are carried over; scripts are converted to the Milka API where possible.',
+    'The folder of a Bruno collection (with its bruno.json, or its opencollection.yml for the YAML format of Bruno 3). Folders, requests, environments, assertions and scripts are carried over; scripts are converted to the Milka API where possible.',
   postman: 'A Postman collection exported as v2.1 JSON. The request bodies of saved examples become extra bodies of the request.',
   openapi:
     'An OpenAPI 3 document, YAML or JSON. One request per operation, grouped by tag; named examples become bodies, servers become environments.',

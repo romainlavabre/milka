@@ -1,0 +1,13 @@
+info:
+  name: "Orders"
+  type: folder
+  seq: 1
+
+request:
+  auth: inherit
+  headers:
+    - name: Service
+      value: orders
+
+docs: |-
+  Orders of the shop.

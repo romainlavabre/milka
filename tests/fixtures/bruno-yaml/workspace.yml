@@ -1,0 +1,8 @@
+opencollection: 1.0.0
+info:
+  name: "Shop"
+  type: workspace
+
+collections:
+  - name: "Shop API"
+    path: "collections/shop"

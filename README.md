@@ -154,8 +154,10 @@ Other commands: `milka import bruno|postman|openapi <source>`, `milka import cur
 
 ## Import and export
 
-- **Bruno**: a collection folder, with its folders, environments (secret variables stay secret), assertions and
-  scripts, converted to the Milka API where a call has an equivalent.
+- **Bruno**: a collection folder, in the `.bru` format or the YAML format of Bruno 3 (`opencollection.yml`), with its
+  folders, environments (secret variables stay secret), assertions and scripts, converted to the Milka API where a call
+  has an equivalent (chai assertions such as `expect(x).to.equal(y)` included). The bodies of saved examples become
+  extra bodies. WebSocket requests are skipped.
 - **Postman**: collections v2.1, where the bodies of saved examples become extra bodies; environments from the
   environments panel.
 - **OpenAPI 3** (YAML or JSON): one request per operation, grouped by tag, named examples as bodies, servers as

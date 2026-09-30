@@ -63,6 +63,66 @@ describe('Bruno import', () => {
       secrets: ['token']
     })
   })
+
+  it('imports the YAML format of Bruno 3 (OpenCollection)', () => {
+    const result = writeImported(store, importBruno(join(fixtures, 'bruno-yaml/collections/shop')))
+    // The name comes from the Bruno workspace, not from the generic one of opencollection.yml.
+    expect(result).toMatchObject({
+      slug: 'shop-api',
+      requests: 2,
+      warnings: ['orders/Live.yml: websocket requests are not supported yet, skipped']
+    })
+    const collection = store.readCollection('shop-api')
+    expect(collection).toMatchObject({
+      name: 'Shop API',
+      headers: [{ name: 'X-Client', value: 'milka-tests' }],
+      auth: { type: 'bearer', token: '{{token}}' },
+      docs: 'The shop API.'
+    })
+    expect(collection.scripts.pre).toContain('req.setHeader("X-Request-Id"')
+    expect(store.readTree('shop-api').map((n) => n.name)).toEqual(['Orders', 'Health'])
+    expect(store.readFolder('shop-api', 'orders')).toMatchObject({
+      headers: [{ name: 'Service', value: 'orders' }],
+      docs: 'Orders of the shop.'
+    })
+    const order = store.readRequest('shop-api', 'orders/create-order.yaml')
+    expect(order).toMatchObject({
+      method: 'POST',
+      url: '{{baseUrl}}/orders',
+      params: [
+        { name: 'dryRun', value: 'true', enabled: true, type: 'query' },
+        { name: 'debug', value: '1', enabled: false, type: 'query' }
+      ],
+      auth: { type: 'inherit' },
+      vars: { pre: [{ name: 'quantity', value: '2' }] },
+      assertions: [
+        { expr: 'res.status', op: 'eq', value: '201' },
+        { expr: 'res.body.id', op: 'isType', value: 'number' }
+      ],
+      docs: 'Creates an order.',
+      settings: { timeout: 10000, followRedirects: false, maxRedirects: 5 }
+    })
+    // The saved example becomes a second body.
+    expect(order.bodies.map((b) => [b.name, b.type])).toEqual([
+      ['Default', 'json'],
+      ['Without quantity', 'json']
+    ])
+    expect(order.scripts.post).toContain('milka.vars.set("orderId", res.body.id);')
+    expect(order.tests).toContain('expect(res.status).toBe(201);')
+    expect(order.tests).toContain('expect(res.body.lines).toHaveLength(1);')
+    expect(order.tests).toContain('expect(res.body.paid).toBe(false);')
+    expect(order.tests).toContain('expect(res.body.status).not.toBe("cancelled");')
+    expect(store.readRequest('shop-api', 'health.yaml').auth).toMatchObject({ type: 'apikey', key: 'X-Api-Key', in: 'header' })
+    expect(store.readEnvironment('shop-api', 'local')).toEqual({
+      name: 'Local',
+      vars: [{ name: 'baseUrl', value: 'http://localhost:3000', enabled: true, description: '' }],
+      secrets: ['token']
+    })
+  })
+
+  it('explains that a Bruno workspace is imported collection by collection', () => {
+    expect(() => importBruno(join(fixtures, 'bruno-yaml'))).toThrow(/is a Bruno workspace/)
+  })
 })
 
 describe('Postman import', () => {

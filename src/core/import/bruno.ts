@@ -1,5 +1,6 @@
 // Imports a Bruno collection folder (bruno.json, collection.bru, folder.bru,
-// *.bru requests and environments/*.bru).
+// *.bru requests and environments/*.bru). Collections in the YAML format of
+// Bruno 3 are read by ./opencollection.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import {
@@ -19,6 +20,7 @@ import {
   type Param
 } from '../model'
 import { convertScript, type ImportedCollection, type ImportedItem } from './imported'
+import { importOpenCollection } from './opencollection'
 
 interface BruRow {
   name: string
@@ -237,9 +239,15 @@ function readItems(dir: string, warnings: string[], root: boolean): ImportedItem
   return items.sort((a, b) => a.seq - b.seq).map((i) => i.item)
 }
 
+/** Imports a Bruno collection folder, in the .bru format or in the YAML format of Bruno 3. */
 export function importBruno(dir: string): ImportedCollection {
+  if (existsSync(join(dir, 'opencollection.yml'))) return importOpenCollection(dir)
   const manifest = join(dir, 'bruno.json')
-  if (!existsSync(manifest)) throw new Error(`Not a Bruno collection: ${dir} has no bruno.json`)
+  if (!existsSync(manifest)) {
+    if (existsSync(join(dir, 'workspace.yml')))
+      throw new Error(`${dir} is a Bruno workspace: import its collections one by one, from its collections folder`)
+    throw new Error(`Not a Bruno collection: ${dir} has neither bruno.json nor opencollection.yml`)
+  }
   const { name } = JSON.parse(readFileSync(manifest, 'utf8')) as { name?: string }
   const warnings: string[] = []
   const collectionFile = join(dir, 'collection.bru')

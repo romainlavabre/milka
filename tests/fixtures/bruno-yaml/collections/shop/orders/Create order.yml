@@ -1,0 +1,67 @@
+info:
+  name: Create order
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{baseUrl}}/orders?dryRun=true"
+  params:
+    - name: dryRun
+      value: "true"
+      type: query
+    - name: debug
+      value: "1"
+      type: query
+      disabled: true
+  headers:
+    - name: Content-Type
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "sku": "ABC-1",
+        "quantity": {{quantity}}
+      }
+  auth: inherit
+
+runtime:
+  variables:
+    - name: quantity
+      value: "2"
+  scripts:
+    - type: after-response
+      code: |-
+        bru.setVar("orderId", res.getBody().id);
+    - type: tests
+      code: |-
+        test("responds 201", () => {
+          expect(res.getStatus()).to.equal(201);
+          expect(res.getBody().lines).to.have.lengthOf(1);
+          expect(res.getBody().paid).to.be.false;
+          expect(res.getBody().status).to.not.equal("cancelled");
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.id
+      operator: isNumber
+
+settings:
+  encodeUrl: true
+  timeout: 10000
+  followRedirects: false
+  maxRedirects: 5
+
+examples:
+  - name: Without quantity
+    request:
+      url: "{{baseUrl}}/orders"
+      method: POST
+      body:
+        type: json
+        data: '{ "sku": "ABC-1" }'
+
+docs: Creates an order.

@@ -1,0 +1,7 @@
+info:
+  name: Live
+  type: websocket
+  seq: 2
+
+websocket:
+  url: "wss://localhost:3000/live"

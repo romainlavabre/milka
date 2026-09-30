@@ -51,6 +51,9 @@ export function convertScript(code: string, tool: 'Bruno' | 'Postman'): string {
     .replace(/\bbru\.getEnvVar\(/g, 'milka.env.get(')
     .replace(/\bbru\.getEnvName\(\)/g, 'milka.env.name')
     .replace(/\bbru\.sleep\(/g, 'milka.sleep(')
+    .replace(/\bbru\.sendRequest\(/g, 'milka.sendRequest(')
+    .replace(/\bbru\.runner\.skipRequest\(\)/g, 'milka.skip()')
+    .replace(/\breq\.deleteHeader\(/g, 'req.removeHeader(')
     .replace(/\bres\.getBody\(\)/g, 'res.body')
     .replace(/\bres\.getStatus\(\)/g, 'res.status')
     .replace(/\bres\.getHeaders\(\)/g, 'res.headers')
@@ -74,5 +77,66 @@ export function convertScript(code: string, tool: 'Bruno' | 'Postman'): string {
     .replace(/\bpm\.request\.url\.toString\(\)/g, 'req.url')
     .replace(/\bpm\.test\(/g, 'test(')
     .replace(/\bpm\.expect\(/g, 'expect(')
+    // Both use chai: expect(x).to.equal(y) becomes expect(x).toBe(y).
+    .replace(CHAI_CHAIN, convertChai)
   return `// Imported from ${tool}: check the calls Milka does not know (see the script API with Ctrl+Space).\n${converted}`
+}
+
+/** Words chai chains read through: `.to.be`, `.to.not.have`, `.to.deep`… */
+const CHAI_WORDS = 'to|be|been|is|that|which|and|has|have|with|at|of|does|not|deep|own'
+const CHAI_CHAIN = new RegExp(`\\.((?:(?:${CHAI_WORDS})\\.)+)([A-Za-z]+)\\b(\\s*\\()?`, 'g')
+
+/** Chai methods and their Milka matcher. */
+const CHAI_METHODS: Record<string, string> = {
+  equal: 'toBe',
+  equals: 'toBe',
+  eq: 'toBe',
+  eql: 'toEqual',
+  eqls: 'toEqual',
+  above: 'toBeGreaterThan',
+  gt: 'toBeGreaterThan',
+  greaterThan: 'toBeGreaterThan',
+  least: 'toBeGreaterThanOrEqual',
+  gte: 'toBeGreaterThanOrEqual',
+  below: 'toBeLessThan',
+  lt: 'toBeLessThan',
+  lessThan: 'toBeLessThan',
+  most: 'toBeLessThanOrEqual',
+  lte: 'toBeLessThanOrEqual',
+  include: 'toContain',
+  includes: 'toContain',
+  contain: 'toContain',
+  contains: 'toContain',
+  property: 'toHaveProperty',
+  match: 'toMatch',
+  matches: 'toMatch',
+  length: 'toHaveLength',
+  lengthOf: 'toHaveLength',
+  a: 'toBeTypeOf',
+  an: 'toBeTypeOf',
+  oneOf: 'toBeOneOf'
+}
+
+/** Chai properties, asserting without a call: `.to.be.true`. */
+const CHAI_PROPERTIES: Record<string, string> = {
+  true: 'toBe(true)',
+  false: 'toBe(false)',
+  null: 'toBeNull()',
+  undefined: 'toBeUndefined()',
+  exist: 'toBeDefined()',
+  ok: 'toBeTruthy()',
+  empty: 'toHaveLength(0)'
+}
+
+function convertChai(chain: string, words: string, last: string, call: string | undefined): string {
+  const parts = words.split('.')
+  if (!parts.includes('to')) return chain
+  const not = parts.includes('not') ? '.not' : ''
+  if (call) {
+    const matcher = CHAI_METHODS[last]
+    if (!matcher) return chain
+    return `${not}.${matcher === 'toBe' && parts.includes('deep') ? 'toEqual' : matcher}(`
+  }
+  const property = CHAI_PROPERTIES[last]
+  return property ? `${not}.${property}` : chain
 }
