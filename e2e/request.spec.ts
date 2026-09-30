@@ -11,7 +11,7 @@ test('sends each body variant of a request', async () => {
   await createRequest(page, 'Users', 'Create user')
 
   await page.getByLabel('Method').selectOption('POST')
-  await page.getByLabel('URL').fill(`${server.url}/users`)
+  await page.getByLabel('URL', { exact: true }).fill(`${server.url}/users`)
 
   await page.getByRole('tab', { name: 'Body' }).click()
   await page.getByRole('button', { name: 'Add body' }).click()

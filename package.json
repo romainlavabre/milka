@@ -30,6 +30,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@apidevtools/swagger-parser": "^13.1.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@radix-ui/react-context-menu": "^2.3.7",

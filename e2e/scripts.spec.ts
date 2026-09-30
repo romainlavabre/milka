@@ -9,7 +9,7 @@ test('completes the script API and reports tests', async () => {
   await createWorkspace(page, 'Acme')
   await createCollection(page, 'Echo')
   await createRequest(page, 'Echo', 'Ping')
-  await page.getByLabel('URL').fill(`${server.url}/echo`)
+  await page.getByLabel('URL', { exact: true }).fill(`${server.url}/echo`)
 
   await page.getByRole('tab', { name: 'Scripts' }).click()
   await page.locator('.monaco-editor').first().click()

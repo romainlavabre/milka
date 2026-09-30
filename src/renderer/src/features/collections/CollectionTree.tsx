@@ -2,7 +2,22 @@
 // requests, context menus, colors and drag and drop reordering.
 import * as ContextMenu from '@radix-ui/react-context-menu'
 import clsx from 'clsx'
-import { ChevronRight, Copy, FilePlus, Folder as FolderIcon, FolderPlus, Palette, Pencil, Play, Plus, Settings, Trash2 } from 'lucide-react'
+import {
+  ChevronRight,
+  Copy,
+  Download,
+  FilePlus,
+  Folder as FolderIcon,
+  FolderPlus,
+  Palette,
+  Pencil,
+  Play,
+  Plus,
+  Settings,
+  Terminal,
+  Trash2,
+  Upload
+} from 'lucide-react'
 import { useState, type DragEvent, type ReactNode } from 'react'
 import { COLLECTION_COLORS, newCollection, newFolder, newRequest, type CollectionSummary, type TreeNode } from '@core/model'
 import { api, errorMessage } from '../../lib/bridge'
@@ -10,6 +25,7 @@ import { confirm, prompt, toast } from '../../components/feedback'
 import { EmptyState, IconButton } from '../../components/ui'
 import { closeTabsUnder, openTab, retargetTabs, tabId, useApp } from '../../store'
 import { menuContentClass, menuItemClass } from '../workspace/WorkspaceSwitcher'
+import { ImportDialog } from './ImportDialog'
 import { methodColor, parentOf, useCollections, useRefreshContent } from './useCollections'
 
 const DRAG_TYPE = 'application/x-milka-node'
@@ -60,14 +76,19 @@ function useActions() {
 export function CollectionTree() {
   const { data: collections, isLoading } = useCollections()
   const actions = useActions()
+  const [importing, setImporting] = useState(false)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between px-3 pb-1 pt-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Collections</span>
+      <div className="flex items-center gap-0.5 px-3 pb-1 pt-2">
+        <span className="flex-1 text-[10px] font-semibold uppercase tracking-wider text-muted">Collections</span>
+        <IconButton label="Import (Bruno, Postman, OpenAPI, cURL)" onClick={() => setImporting(true)}>
+          <Download className="size-4" />
+        </IconButton>
         <IconButton label="New collection" onClick={() => void actions.newCollection()}>
           <Plus className="size-4" />
         </IconButton>
+        <ImportDialog open={importing} onOpenChange={setImporting} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-4">
         {collections?.map((collection) => (
@@ -89,6 +110,22 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
   const [open, setOpen] = useState(true)
   const actions = useActions()
   const [dropping, setDropping] = useState(false)
+  const [importingCurl, setImportingCurl] = useState(false)
+
+  const exportOpenApi = async (): Promise<void> => {
+    const file = await api.dialog.saveFile({
+      title: 'Export as OpenAPI',
+      defaultName: `${collection.slug}.openapi.yaml`,
+      filters: [{ name: 'OpenAPI', extensions: ['yaml', 'yml', 'json'] }]
+    })
+    if (!file) return
+    try {
+      await api.exporter.openapi({ collection: collection.slug, file })
+      toast(`OpenAPI document written to ${file}`, 'success')
+    } catch (error) {
+      toast(errorMessage(error), 'error')
+    }
+  }
 
   const setColor = (color: string): Promise<unknown> =>
     actions.run(async () =>
@@ -161,8 +198,14 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
             >
               New folder
             </MenuItem>
+            <MenuItem icon={<Terminal className="size-3.5" />} onSelect={() => setImportingCurl(true)}>
+              New request from cURL
+            </MenuItem>
             <MenuItem icon={<Play className="size-3.5" />} onSelect={() => openTab('runner', collection.slug)}>
               Run collection
+            </MenuItem>
+            <MenuItem icon={<Upload className="size-3.5" />} onSelect={() => void exportOpenApi()}>
+              Export as OpenAPI…
             </MenuItem>
             <ContextMenu.Separator className="my-1 h-px bg-border" />
             <MenuItem icon={<Settings className="size-3.5" />} onSelect={() => openTab('collection', collection.slug)}>
@@ -199,6 +242,7 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
           </ContextMenu.Content>
         </ContextMenu.Portal>
       </ContextMenu.Root>
+      <ImportDialog open={importingCurl} onOpenChange={setImportingCurl} initial="curl" collection={collection.slug} />
       {open && (
         <div className="ml-2 border-l border-border/60 pl-1">
           {collection.children.map((node) => (

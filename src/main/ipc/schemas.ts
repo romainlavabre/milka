@@ -59,6 +59,16 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     runtimeVars: none,
     clearRuntimeVars: none
   },
+  importer: {
+    collection: z
+      .object({ format: z.enum(['bruno', 'postman', 'openapi']), path: z.string().min(1).optional(), text: z.string().optional() })
+      .refine((a) => a.path !== undefined || a.text !== undefined, 'path or text is required'),
+    environment: z.object({ collection, path: z.string().min(1) }),
+    curl: z.object({ collection, parent: z.string(), command: z.string().min(1) })
+  },
+  exporter: {
+    openapi: z.object({ collection, file: z.string().min(1) })
+  },
   runner: {
     run: z.object({
       runId: z.string().min(1),
@@ -77,7 +87,12 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
   },
   dialog: {
     openDirectory: z.object({ title: z.string() }),
-    openFile: z.object({ title: z.string(), filters: z.array(z.object({ name: z.string(), extensions: z.array(z.string()) })).optional() })
+    openFile: z.object({ title: z.string(), filters: z.array(z.object({ name: z.string(), extensions: z.array(z.string()) })).optional() }),
+    saveFile: z.object({
+      title: z.string(),
+      defaultName: z.string(),
+      filters: z.array(z.object({ name: z.string(), extensions: z.array(z.string()) })).optional()
+    })
   },
   app: {
     info: none

@@ -1,11 +1,20 @@
 // Collections, folders, requests and environments of the active workspace.
 // Every change is committed with its own message; secret values of
 // environments go to the local secret store, never to the repository.
+import { readFileSync, writeFileSync } from 'node:fs'
+import { exportOpenApi, openApiText } from '@core/export/openapi'
+import { importBruno } from '@core/import/bruno'
+import { importCurl } from '@core/import/curl'
+import { writeImported, type ImportResult } from '@core/import/imported'
+import { importOpenApi } from '@core/import/openapi'
+import { importPostman, importPostmanEnvironment } from '@core/import/postman'
 import { WorkspaceStore } from '@core/layout/store'
 import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '@core/model'
 import type { EnvironmentDraft } from '@shared/types'
 import type { SecretStore, SecretValues } from '../secrets'
 import type { WorkspaceManager } from './manager'
+
+export type ImportFormat = 'bruno' | 'postman' | 'openapi'
 
 export function secretScope(collection: string, env: string): string {
   return `${collection}/${env}`
@@ -115,6 +124,40 @@ export class ContentService {
       const name = store.readTree(slug, parent).find((node) => node.path === result.id)?.name ?? result.id
       return { result: result.id, paths: result.paths, message: `Move "${name}"` }
     })
+  }
+
+  // -------------------------------------------------------- import/export
+
+  /** Imports a Bruno folder, a Postman collection or an OpenAPI document as a new collection, in one commit. */
+  async importCollection(format: ImportFormat, source: { path?: string; text?: string }): Promise<ImportResult> {
+    const read = (): string => {
+      if (source.text !== undefined) return source.text
+      if (!source.path) throw new Error('Nothing to import')
+      return readFileSync(source.path, 'utf8')
+    }
+    const imported =
+      format === 'bruno' ? importBruno(source.path ?? '') : format === 'postman' ? importPostman(read()) : importOpenApi(read())
+    const repo = this.workspace.active()
+    const label = { bruno: 'Bruno', postman: 'Postman', openapi: 'OpenAPI' }[format]
+    return this.workspace.change(repo, () => {
+      const result = writeImported(new WorkspaceStore(repo.path), imported)
+      return { result, paths: result.paths, message: `Import collection "${imported.collection.name}" from ${label}` }
+    })
+  }
+
+  /** Adds a Postman environment export to a collection. */
+  importEnvironment(slug: string, path: string): Promise<string> {
+    const environment = importPostmanEnvironment(readFileSync(path, 'utf8'))
+    return this.saveEnvironment(slug, null, environment, {})
+  }
+
+  /** Creates a request from a cURL command. */
+  importCurl(slug: string, parent: string, command: string): Promise<string> {
+    return this.saveRequest(slug, parent, null, importCurl(command))
+  }
+
+  exportOpenApi(slug: string, file: string): void {
+    writeFileSync(file, openApiText(exportOpenApi(this.store(), slug), file.endsWith('.json') ? 'json' : 'yaml'))
   }
 
   /** Every variable name defined in a collection, its folders, requests and environments. */

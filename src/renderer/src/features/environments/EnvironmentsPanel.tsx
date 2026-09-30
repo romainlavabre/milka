@@ -2,7 +2,7 @@
 // and secret variables whose values stay encrypted on this machine.
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import clsx from 'clsx'
-import { Copy, Eye, EyeOff, Globe, Lock, LockOpen, Plus, Save, ShieldAlert, Trash2 } from 'lucide-react'
+import { Copy, Download, Eye, EyeOff, Globe, Lock, LockOpen, Plus, Save, ShieldAlert, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { newEnvironment, type Environment } from '@core/model'
 import type { EnvironmentDraft } from '@shared/types'
@@ -77,6 +77,22 @@ export function EnvironmentsPanel({ collection }: { collection: string }) {
     }
   }
 
+  const importPostman = async (): Promise<void> => {
+    const path = await api.dialog.openFile({
+      title: 'Postman environment',
+      filters: [{ name: 'Postman environment', extensions: ['json'] }]
+    })
+    if (!path) return
+    try {
+      const slug = await api.importer.environment({ collection, path })
+      await queryClient.invalidateQueries({ queryKey: ['environments', collection] })
+      setSelected(slug)
+      toast('Environment imported: type the values of its secret variables', 'success')
+    } catch (error) {
+      toast(errorMessage(error), 'error')
+    }
+  }
+
   if (isLoading) return <Spinner className="m-4" />
 
   return (
@@ -84,9 +100,14 @@ export function EnvironmentsPanel({ collection }: { collection: string }) {
       <div className="flex w-56 shrink-0 flex-col border-r border-border">
         <div className="flex items-center justify-between px-3 py-2">
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted">Environments</span>
-          <IconButton label="New environment" onClick={() => void create()}>
-            <Plus className="size-4" />
-          </IconButton>
+          <div className="flex">
+            <IconButton label="Import a Postman environment" onClick={() => void importPostman()}>
+              <Download className="size-4" />
+            </IconButton>
+            <IconButton label="New environment" onClick={() => void create()}>
+              <Plus className="size-4" />
+            </IconButton>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-auto px-1">
           {environments?.map((env) => (

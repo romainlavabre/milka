@@ -57,6 +57,6 @@ export async function createCollection(page: Page, name: string): Promise<void> 
 
 export async function createRequest(page: Page, collection: string, name: string): Promise<void> {
   await page.getByText(collection, { exact: true }).first().click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'New request' }).click()
+  await page.getByRole('menuitem', { name: 'New request', exact: true }).click()
   await answerPrompt(page, name)
 }

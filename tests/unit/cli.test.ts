@@ -71,6 +71,25 @@ function io(env: Record<string, string> = {}): CliIo & { out: string; err: strin
   return result
 }
 
+describe('milka import / export', () => {
+  it('imports Bruno, OpenAPI and cURL, and exports OpenAPI', async () => {
+    const fixtures = join(__dirname, '../fixtures')
+    const output = io()
+    expect(await runCli(['import', 'bruno', join(fixtures, 'bruno')], output)).toBe(0)
+    expect(await runCli(['import', 'openapi', join(fixtures, 'petstore.yaml')], output)).toBe(0)
+    expect(await runCli(['import', 'curl', 'curl -X DELETE https://x.io/users/1', '--into', 'collections/shop-api/orders'], output)).toBe(0)
+    expect(output.out).toContain('Imported 2 requests into collections/shop-api')
+    expect(output.out).toContain('Created collections/shop-api/orders/delete-users-1.yaml')
+
+    const exported = io()
+    expect(await runCli(['export', 'openapi', 'collections/petstore'], exported)).toBe(0)
+    expect(exported.out).toContain('openapi: 3.1.0')
+    expect(await runCli(['export', 'openapi', 'collections/petstore', '-o', 'docs/api.json'], io())).toBe(0)
+    expect(JSON.parse(readFileSync(join(root, 'docs/api.json'), 'utf8')).info.title).toBe('Petstore')
+    expect(await runCli(['import', 'soap', 'x.wsdl'], io())).toBe(2)
+  })
+})
+
 describe('milka run', () => {
   it('passes with the selected bodies and a secret from the process environment', async () => {
     const output = io({ MILKA_SECRET_TOKEN: 't0k' })

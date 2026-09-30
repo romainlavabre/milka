@@ -84,6 +84,19 @@ export function createHandlers({ workspace, content, execution, settings, window
         execution.clearRuntimeVars()
       }
     },
+    importer: {
+      async collection({ format, path, text }) {
+        const { slug, requests, warnings } = await content.importCollection(format, { path, text })
+        return { slug, requests, warnings }
+      },
+      environment: ({ collection, path }) => content.importEnvironment(collection, path),
+      curl: ({ collection, parent, command }) => content.importCurl(collection, parent, command)
+    },
+    exporter: {
+      async openapi({ collection, file }) {
+        content.exportOpenApi(collection, file)
+      }
+    },
     runner: {
       run: (args) => execution.run(args, (runCase, index, total) => events.runnerCase({ runId: args.runId, runCase, index, total })),
       async cancel({ runId }) {
@@ -104,6 +117,12 @@ export function createHandlers({ workspace, content, execution, settings, window
         const options = { title, properties: ['openDirectory', 'createDirectory'] as ('openDirectory' | 'createDirectory')[] }
         const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
         return result.canceled ? null : (result.filePaths[0] ?? null)
+      },
+      async saveFile({ title, defaultName, filters }) {
+        const win = window()
+        const options = { title, defaultPath: defaultName, filters }
+        const result = win ? await dialog.showSaveDialog(win, options) : await dialog.showSaveDialog(options)
+        return result.canceled ? null : (result.filePath ?? null)
       },
       async openFile({ title, filters }) {
         const win = window()

@@ -1,0 +1,51 @@
+meta {
+  name: Create order
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/orders?dryRun=true
+  body: json
+  auth: inherit
+}
+
+params:query {
+  dryRun: true
+  ~debug: 1
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "sku": "ABC-1",
+    "quantity": 2
+  }
+}
+
+vars:post-response {
+  orderId: res.body.id
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: isNumber
+}
+
+script:pre-request {
+  bru.setVar("started", Date.now());
+}
+
+tests {
+  test("has an id", function () {
+    const data = res.getBody();
+    expect(data.id).to.exist;
+  });
+}
+
+docs {
+  Creates an order.
+}

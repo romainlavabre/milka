@@ -27,7 +27,7 @@ test('sends requests with environment variables and local secrets', async () => 
   expect(file).not.toContain('s3cr3t-value')
 
   await createRequest(page, 'Echo', 'Whoami')
-  await page.getByLabel('URL').fill('{{baseUrl}}/echo')
+  await page.getByLabel('URL', { exact: true }).fill('{{baseUrl}}/echo')
   await page.getByRole('tab', { name: 'Headers' }).click()
   await page.getByPlaceholder('Header').fill('X-Token')
   await page.getByPlaceholder('Value').first().fill('{{token}}')

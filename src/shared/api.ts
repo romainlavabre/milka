@@ -67,6 +67,22 @@ export interface Api {
     runtimeVars(): Promise<Record<string, string>>
     clearRuntimeVars(): Promise<void>
   }
+  importer: {
+    /** A Bruno collection folder (`path`), or a Postman / OpenAPI file (`path`) or text (`text`). */
+    collection(args: {
+      format: 'bruno' | 'postman' | 'openapi'
+      path?: string
+      text?: string
+    }): Promise<{ slug: string; requests: number; warnings: string[] }>
+    /** A Postman environment file into a collection. */
+    environment(args: { collection: string; path: string }): Promise<string>
+    /** A cURL command as a new request; returns its path. */
+    curl(args: { collection: string; parent: string; command: string }): Promise<string>
+  }
+  exporter: {
+    /** Writes the collection as OpenAPI 3.1, YAML or JSON after the file extension. */
+    openapi(args: { collection: string; file: string }): Promise<void>
+  }
   runner: {
     /** Runs requests and their tests; cases are pushed with `runner:case` as they complete. */
     run(args: {
@@ -87,6 +103,7 @@ export interface Api {
   dialog: {
     openDirectory(args: { title: string }): Promise<string | null>
     openFile(args: { title: string; filters?: { name: string; extensions: string[] }[] }): Promise<string | null>
+    saveFile(args: { title: string; defaultName: string; filters?: { name: string; extensions: string[] }[] }): Promise<string | null>
   }
   app: {
     info(): Promise<AppInfo>
@@ -124,9 +141,11 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
   ],
   environments: ['list', 'get', 'save', 'remove'],
   http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars'],
+  importer: ['collection', 'environment', 'curl'],
+  exporter: ['openapi'],
   runner: ['run', 'cancel'],
   settings: ['get', 'set'],
-  dialog: ['openDirectory', 'openFile'],
+  dialog: ['openDirectory', 'openFile', 'saveFile'],
   app: ['info']
 }
 

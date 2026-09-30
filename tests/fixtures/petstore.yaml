@@ -1,0 +1,104 @@
+openapi: 3.0.3
+info:
+  title: Petstore
+  version: 1.0.0
+  description: A sample pet store.
+servers:
+  - url: https://petstore.example.com/v1/
+    description: Production
+  - url: http://localhost:8080/v1
+    description: Local
+security:
+  - bearer: []
+tags:
+  - name: pets
+    description: Everything about pets
+paths:
+  /pets:
+    get:
+      tags: [pets]
+      summary: List pets
+      operationId: listPets
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            example: 20
+      responses:
+        '200':
+          description: A list of pets
+    post:
+      tags: [pets]
+      summary: Create a pet
+      operationId: createPet
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewPet'
+            examples:
+              dog:
+                summary: A dog
+                value: { name: Rex, tag: dog }
+              nameless:
+                summary: Without name
+                value: { tag: cat }
+      responses:
+        '201':
+          description: Created
+  /pets/{petId}:
+    parameters:
+      - name: petId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [pets]
+      summary: Get a pet
+      responses:
+        '200':
+          description: The pet
+    put:
+      tags: [pets]
+      summary: Update a pet
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pet'
+      responses:
+        '200':
+          description: Updated
+  /health:
+    get:
+      summary: Health
+      security: []
+      responses:
+        '200':
+          description: OK
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    NewPet:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        tag:
+          type: string
+    Pet:
+      allOf:
+        - $ref: '#/components/schemas/NewPet'
+        - type: object
+          properties:
+            id:
+              type: integer
+            owner:
+              $ref: '#/components/schemas/Pet'

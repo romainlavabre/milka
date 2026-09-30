@@ -1,12 +1,18 @@
 // Command line interface: `milka run` for CI, imports, OpenAPI export and the MCP server.
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { parseArgs } from 'node:util'
 import { environmentValues, secretsFromProcessEnv } from '../core/environment'
+import { exportOpenApi, openApiText } from '../core/export/openapi'
+import { importBruno } from '../core/import/bruno'
+import { importCurl } from '../core/import/curl'
+import { writeImported } from '../core/import/imported'
+import { importOpenApi } from '../core/import/openapi'
+import { importPostman } from '../core/import/postman'
 import { WorkspaceStore } from '../core/layout/store'
 import { ANSI_COLORS, NO_COLORS, consoleCase, consoleSummary, jsonReport, junitReport } from '../core/reporters'
 import { runCollection, type RunSummary } from '../core/runner'
-import { resolveTarget, UsageError } from './workspace'
+import { findWorkspaceRoot, resolveTarget, UsageError } from './workspace'
 
 export interface CliIo {
   stdout(text: string): void
@@ -25,7 +31,16 @@ const HELP = `Milka — API client with git-backed workspaces
 Usage:
   milka                                 Open the app
   milka run <path> [options]            Run requests and their tests (CI)
+  milka import bruno <folder>           Import a Bruno collection into the workspace
+  milka import postman <file.json>      Import a Postman collection (v2.1)
+  milka import openapi <file>           Import an OpenAPI 3 document (YAML or JSON)
+  milka import curl "<command>" --into collections/<collection>
+                                        Create a request from a cURL command
+  milka export openapi <collection> [-o file]
+                                        Export a collection as OpenAPI 3.1 (stdout by default)
   milka help                            Show this help
+
+  Imports go to the workspace of the current folder, or of --workspace <folder>.
 
 milka run <path>
   <path> is a workspace, a collection folder, a folder inside it or a request file,
@@ -137,6 +152,60 @@ async function run(args: string[], io: CliIo): Promise<number> {
   return total.failed > 0 ? 1 : 0
 }
 
+function workspaceRoot(option: string | undefined, io: CliIo): string {
+  const root = findWorkspaceRoot(resolve(io.cwd, option ?? '.'))
+  if (!root) throw new UsageError('Not inside a Milka workspace: run it from a workspace folder or pass --workspace <folder>')
+  return root
+}
+
+async function importCommand(args: string[], io: CliIo): Promise<number> {
+  const { values, positionals } = parseArgs({
+    args,
+    allowPositionals: true,
+    options: { workspace: { type: 'string' }, into: { type: 'string' } }
+  })
+  const [format, source] = positionals
+  if (!format || !source || positionals.length !== 2) throw new UsageError('milka import <bruno|postman|openapi|curl> <source>')
+  if (format === 'curl') {
+    if (!values.into) throw new UsageError('milka import curl "<command>" --into collections/<collection>[/<folder>]')
+    const target = resolveTarget(values.into, io.cwd)
+    if (!target.collection) throw new UsageError('--into must be a collection or a folder of a collection')
+    const store = new WorkspaceStore(target.root)
+    const { id } = store.writeRequest(target.collection, target.path, null, importCurl(source))
+    io.stdout(`Created collections/${target.collection}/${id}\n`)
+    return 0
+  }
+  const store = new WorkspaceStore(workspaceRoot(values.workspace, io))
+  const path = resolve(io.cwd, source)
+  let imported
+  if (format === 'bruno') imported = importBruno(path)
+  else if (format === 'postman') imported = importPostman(readFileSync(path, 'utf8'))
+  else if (format === 'openapi') imported = importOpenApi(readFileSync(path, 'utf8'))
+  else throw new UsageError(`Unknown import format "${format}": use bruno, postman, openapi or curl`)
+  const result = writeImported(store, imported)
+  io.stdout(`Imported ${result.requests} requests into collections/${result.slug}\n`)
+  for (const warning of result.warnings) io.stderr(`warning: ${warning}\n`)
+  return 0
+}
+
+async function exportCommand(args: string[], io: CliIo): Promise<number> {
+  const { values, positionals } = parseArgs({ args, allowPositionals: true, options: { output: { type: 'string', short: 'o' } } })
+  const [format, collectionPath] = positionals
+  if (format !== 'openapi' || !collectionPath) throw new UsageError('milka export openapi collections/<collection> [-o openapi.yaml]')
+  const target = resolveTarget(collectionPath, io.cwd)
+  if (!target.collection || target.path) throw new UsageError('milka export openapi expects a collection folder')
+  const document = exportOpenApi(new WorkspaceStore(target.root), target.collection)
+  if (!values.output) {
+    io.stdout(openApiText(document, 'yaml'))
+    return 0
+  }
+  const file = resolve(io.cwd, values.output)
+  mkdirSync(dirname(file), { recursive: true })
+  writeFileSync(file, openApiText(document, file.endsWith('.json') ? 'json' : 'yaml'))
+  io.stdout(`OpenAPI document written to ${file}\n`)
+  return 0
+}
+
 /** Runs a command; returns the process exit code. */
 export async function runCli(argv: string[], io: CliIo): Promise<number> {
   const [command, ...args] = argv
@@ -144,6 +213,10 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
     switch (command) {
       case 'run':
         return await run(args, io)
+      case 'import':
+        return await importCommand(args, io)
+      case 'export':
+        return await exportCommand(args, io)
       case 'version':
       case '--version':
       case '-v':
