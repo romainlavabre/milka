@@ -181,3 +181,88 @@ describe('executeRequest', () => {
     expect(echo.body).toMatch(/^a=\d+&b=x\+y$/)
   })
 })
+
+describe('runRequest and retry', () => {
+  const REFRESH = "if (res.status === 401 && req.name !== 'Token') {\n  await milka.runRequest('service-auth/token.yaml')\n  milka.retry()\n}"
+  const SET_COOKIE = "milka.cookies.set('{{baseUrl}}', 'ACCESS_TOKEN', res.body.access_token)"
+
+  /** A collection refreshing its cookie on 401 through service-auth/token.yaml. */
+  function setupAuth(tokenPost = SET_COOKIE, collectionPost = REFRESH): (request: HttpRequest) => ExecuteOptions {
+    const collection = store.readCollection(store.writeCollection(null, newCollection('API')).id)
+    store.writeCollection('api', { ...collection, vars: [kv('baseUrl', server.url)], scripts: { pre: '', post: collectionPost } })
+    const folder = store.writeFolder('api', '', null, newFolder('Service auth')).id
+    const token = store.writeRequest(
+      'api',
+      folder,
+      null,
+      newRequest('Token', { method: 'POST', url: '{{baseUrl}}/token', scripts: { pre: '', post: tokenPost } })
+    ).id
+    expect(token).toBe('service-auth/token.yaml')
+    return (request) => ({
+      store,
+      collection: 'api',
+      path: store.writeRequest('api', '', null, request).id,
+      environment: { name: null, vars: {} },
+      runtime: {}
+    })
+  }
+
+  it('fetches a token and sends the request again after a 401', async () => {
+    const options = setupAuth()
+    // No cookie jar given: the token request and the retry share the one of this execution.
+    const result = await executeRequest(options(newRequest('Secure', { url: '{{baseUrl}}/secure' })))
+    expect(result.error).toBeNull()
+    expect(result.response?.status).toBe(200)
+    expect(result.retried).toBe(true)
+    expect(result.request?.headers).toContainEqual(['Cookie', 'ACCESS_TOKEN=tok-123'])
+    expect(result.logs).toContainEqual({ level: 'info', source: 'retry', message: 'Retried after 401' })
+  })
+
+  it('retries once only', async () => {
+    const options = setupAuth("milka.cookies.set('{{baseUrl}}', 'ACCESS_TOKEN', 'expired')")
+    const result = await executeRequest(
+      options(newRequest('Secure', { url: '{{baseUrl}}/secure', tests: "test('ok', () => expect(res.status).toBe(200))" }))
+    )
+    expect(result.response?.status).toBe(401)
+    expect(result.retried).toBe(true)
+    expect(result.logs.filter((l) => l.source === 'retry')).toEqual([
+      { level: 'info', source: 'retry', message: 'Retried after 401' },
+      { level: 'warn', source: 'retry', message: 'milka.retry() ignored: the request was already retried' }
+    ])
+    // Only the tests of the second send.
+    expect(result.tests).toHaveLength(1)
+  })
+
+  it('reports an unknown request', async () => {
+    const options = setupAuth(SET_COOKIE, "await milka.runRequest('nope.yaml')")
+    const result = await executeRequest(options(newRequest('Echo', { url: '{{baseUrl}}/echo' })))
+    expect(result.error).toBe('post-response (collection) (line 1): milka.runRequest(): no request nope.yaml in the collection')
+  })
+
+  it('limits nested requests', async () => {
+    const options = setupAuth(SET_COOKIE, '')
+    const result = await executeRequest(
+      options(newRequest('Loop', { url: '{{baseUrl}}/echo', scripts: { pre: "await milka.runRequest('loop.yaml')", post: '' } }))
+    )
+    expect(result.error).toMatch(/milka\.runRequest\(\): more than 3 nested requests \(loop\.yaml\)$/)
+    expect(result.request).toBeNull()
+  })
+
+  it('refuses retry() before the request is sent', async () => {
+    const options = setupAuth()
+    const result = await executeRequest(options(newRequest('Early', { url: '{{baseUrl}}/echo', scripts: { pre: 'milka.retry()', post: '' } })))
+    expect(result.error).toBe('pre-request (request) (line 1): milka.retry() is only available in post-response scripts')
+  })
+
+  it('shows the logs of the request it runs, not its tests', async () => {
+    const options = setupAuth(`${SET_COOKIE}\nconsole.log('token', res.status)\ntest('token', () => expect(1).toBe(1))`)
+    const runtime: Record<string, string> = {}
+    const result = await executeRequest({
+      ...options(newRequest('Secure', { url: '{{baseUrl}}/secure', scripts: { pre: "milka.vars.set('seen', 'yes')", post: '' } })),
+      runtime
+    })
+    expect(result.logs).toContainEqual({ level: 'log', source: 'runRequest service-auth/token.yaml › post-response (request)', message: 'token 200' })
+    expect(result.tests).toEqual([])
+    expect(runtime).toEqual({ seen: 'yes' })
+  })
+})

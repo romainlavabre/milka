@@ -100,6 +100,23 @@ interface Milka {
   }
   /** Sends another request, e.g. to fetch a token. */
   sendRequest(options: MilkaSendOptions): Promise<MilkaResponse>
+  /**
+   * Executes a request of this collection by its path, e.g. milka.runRequest('auth/token.yaml'), with its inherited
+   * headers, auth, scripts and tests. It shares the variables, environment and cookie jar of this request: what its
+   * scripts set is seen right away. Throws when it cannot be sent or a script fails; 3 nested requests at most.
+   */
+  runRequest(
+    path: string,
+    options?: {
+      /** Name of the body to send instead of the selected one. */
+      body?: string
+    }
+  ): Promise<MilkaResponse>
+  /**
+   * Post-response only: sends this request again once every post-response script has run, from its pre-request
+   * scripts on, e.g. after refreshing a token. Once per execution; the result is the one of the second send.
+   */
+  retry(): void
   /** Pre-request only: does not send this request (the run goes on). */
   skip(reason?: string): never
   /** A random UUID v4. */

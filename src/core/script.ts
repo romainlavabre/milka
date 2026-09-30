@@ -65,6 +65,10 @@ export interface MilkaApi {
     clear(url?: string): void
   }
   sendRequest(options: { method?: string; url: string; headers?: Record<string, string>; body?: unknown }): Promise<ScriptResponse>
+  /** Executes a request of the same collection, sharing variables and cookies; `body` names the body to send. */
+  runRequest(path: string, options?: { body?: string }): Promise<ScriptResponse>
+  /** Post-response only: sends the request once more after the post-response scripts. */
+  retry(): void
   skip(reason?: string): void
   uuid(): string
   sleep(ms: number): Promise<void>

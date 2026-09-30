@@ -1,6 +1,6 @@
 // Response of the last send: status, body, headers, timeline, tests and console.
 import clsx from 'clsx'
-import { CheckCircle2, Copy, Send, SkipForward, XCircle } from 'lucide-react'
+import { CheckCircle2, Copy, RotateCw, Send, SkipForward, XCircle } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { succeeded, type ExecutionResult, type Header, type ReceivedResponse } from '@core/results'
 import { CodeEditor, type CodeLanguage } from '../../components/CodeEditor'
@@ -69,6 +69,11 @@ export function ResponsePanel({ result, running, onCancel }: { result: Execution
             </span>
             <span className="text-muted">{formatDuration(response.timings.total)}</span>
             <span className="text-muted">{formatBytes(response.size)}</span>
+            {result.retried && (
+              <span className="flex items-center gap-1 text-muted" title="Sent again by milka.retry()">
+                <RotateCw className="size-3.5" /> Retried
+              </span>
+            )}
           </>
         ) : result.skipped ? (
           <span className="flex items-center gap-1 text-muted">

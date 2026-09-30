@@ -39,6 +39,8 @@ describe('script typings', () => {
       if (!token) milka.skip('no token')
       const login = await milka.sendRequest({ method: 'POST', url: '{{baseUrl}}/login', body: { user: 'x' } })
       milka.vars.set('token', login.body.token)
+      const refreshed = await milka.runRequest('auth/token.yaml', { body: 'Default' })
+      if (refreshed.status === 401) milka.retry()
       await milka.sleep(1)
       console.log(res.status, res.header('content-type'), milka.base64.encode('x'))
       test('created', () => {

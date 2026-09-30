@@ -53,6 +53,8 @@ export interface ExecutionResult {
   error: string | null
   /** Set when a pre-request script called milka.skip(). */
   skipped: string | null
+  /** Set when a post-response script called milka.retry(): the result is the one of the second send. */
+  retried?: boolean
   logs: LogEntry[]
   tests: TestResult[]
   durationMs: number

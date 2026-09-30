@@ -15,6 +15,9 @@ function readBody(req: IncomingMessage): Promise<string> {
   })
 }
 
+/** Token returned by `/token` and expected by `/secure`. */
+export const ACCESS_TOKEN = 'tok-123'
+
 /**
  * Routes:
  * - `/echo…` returns the received method, path, headers and body as JSON
@@ -24,6 +27,8 @@ function readBody(req: IncomingMessage): Promise<string> {
  * - `/login-redirect` sets the cookie HOP=1 and sends to `/echo`
  * - `/users` POST creates a user from a JSON body with a name (400 without)
  * - `/slow` answers after 2 seconds
+ * - `/token` returns the access token `{ access_token: 'tok-123' }`
+ * - `/secure` answers 401 without the cookie ACCESS_TOKEN=tok-123, 200 with it
  */
 export async function startEchoServer(): Promise<EchoServer> {
   let nextId = 1
@@ -62,6 +67,11 @@ export async function startEchoServer(): Promise<EchoServer> {
     if (url.pathname === '/slow') {
       setTimeout(() => json(200, { slow: true }), 2000)
       return
+    }
+    if (url.pathname === '/token') return json(200, { access_token: ACCESS_TOKEN })
+    if (url.pathname === '/secure') {
+      const cookies = (req.headers.cookie ?? '').split(/;\s*/)
+      return cookies.includes(`ACCESS_TOKEN=${ACCESS_TOKEN}`) ? json(200, { ok: true }) : json(401, { error: 'unauthorized' })
     }
     json(404, { error: 'not found' })
   })

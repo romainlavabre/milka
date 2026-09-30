@@ -6,6 +6,7 @@
 //   3. pre-request scripts (collection, folders, request), which may change `req`
 //   4. `{{variable}}` interpolation, auth, body encoding, send
 //   5. post-response variables, scripts, assertions and tests
+//   6. when a post-response script called milka.retry(), once more from step 3
 import { readFileSync } from 'node:fs'
 import { basename, isAbsolute, resolve } from 'node:path'
 import { runAssertions } from './assert'
@@ -250,14 +251,21 @@ function encodeBody(body: Body | null, value: unknown, vars: Variables, root: st
 
 // ------------------------------------------------------------------ execute
 
+/** Nesting limit of milka.runRequest(). */
+const MAX_RUN_DEPTH = 3
+
 export async function executeRequest(options: ExecuteOptions): Promise<ExecutionResult> {
+  return (await execute(options, 0)).result
+}
+
+/** `depth` counts the milka.runRequest() calls that led to this request. */
+async function execute(options: ExecuteOptions, depth: number): Promise<{ result: ExecutionResult; res?: ScriptResponse }> {
   const started = performance.now()
   const { store, collection: slug, path } = options
   const collection = store.readCollection(slug)
   const folders = folderPaths(path).map((folder) => store.readFolder(slug, folder))
   const request = options.request ?? store.readRequest(slug, path)
   const logs: LogEntry[] = []
-  const tests: TestResult[] = []
   const result: ExecutionResult = {
     name: request.name,
     path,
@@ -266,10 +274,9 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
     error: null,
     skipped: null,
     logs,
-    tests,
+    tests: [],
     durationMs: 0
   }
-  const done = (): ExecutionResult => ({ ...result, durationMs: Math.round(performance.now() - started) })
 
   // Variables: request variables can use the lower scopes.
   const processEnv = options.processEnv ?? {}
@@ -284,26 +291,32 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
   const vars = new Variables([options.runtime, requestVars, ...lower], processEnv)
 
   const body = options.bodyName ? (request.bodies.find((b) => b.name === options.bodyName) ?? null) : activeBody(request)
-  const headers = headerMap([collection.headers, ...folders.map((f) => f.headers), request.headers])
-  const req: ScriptRequest = {
-    name: request.name,
-    method: request.method,
-    url: withQuery(
-      withPathParams(
-        request.url,
-        request.params.filter((p) => p.type === 'path')
+  // A new one for each send: a retry starts again from the request as saved.
+  const scriptRequest = (): ScriptRequest => {
+    const req: ScriptRequest = {
+      name: request.name,
+      method: request.method,
+      url: withQuery(
+        withPathParams(
+          request.url,
+          request.params.filter((p) => p.type === 'path')
+        ),
+        request.params.filter((p) => p.type === 'query')
       ),
-      request.params.filter((p) => p.type === 'query')
-    ),
-    headers,
-    body: scriptBody(body),
-    bodyName: body?.name ?? null,
-    setHeader: (name, value) => setHeader(req.headers, name, String(value)),
-    removeHeader: (name) => {
-      for (const h of Object.keys(req.headers)) if (h.toLowerCase() === name.toLowerCase()) delete req.headers[h]
+      headers: headerMap([collection.headers, ...folders.map((f) => f.headers), request.headers]),
+      body: scriptBody(body),
+      bodyName: body?.name ?? null,
+      setHeader: (name, value) => setHeader(req.headers, name, String(value)),
+      removeHeader: (name) => {
+        for (const h of Object.keys(req.headers)) if (h.toLowerCase() === name.toLowerCase()) delete req.headers[h]
+      }
     }
+    return req
   }
 
+  let phase: 'pre' | 'post' | 'tests' = 'pre'
+  let retryRequested = false
+  let retried = false
   const cookies = options.cookies ?? new Cookies()
   // Scripts name the site of a cookie by any URL of it, {{variables}} allowed.
   const cookieUrl = (url: string): string => normalizeUrl(vars.interpolate(url))
@@ -348,6 +361,39 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
       )
       return toScriptResponse(raw, raw.body.toString('utf8'))
     },
+    runRequest: async (requestPath, runOptions) => {
+      if (depth >= MAX_RUN_DEPTH) throw new Error(`milka.runRequest(): more than ${MAX_RUN_DEPTH} nested requests (${requestPath})`)
+      if (!store.listRequests(slug, '').includes(requestPath))
+        throw new Error(`milka.runRequest(): no request ${requestPath} in the collection`)
+      const source = `runRequest ${requestPath}`
+      const run = await execute(
+        {
+          store,
+          collection: slug,
+          path: requestPath,
+          bodyName: runOptions?.body ?? null,
+          environment: options.environment,
+          runtime: options.runtime,
+          cookies,
+          processEnv: options.processEnv,
+          insecure: options.insecure,
+          signal: options.signal
+        },
+        depth + 1
+      )
+      // Its logs show here; its tests are its own.
+      for (const entry of run.result.logs) logs.push({ ...entry, source: `${source} › ${entry.source}` })
+      if (run.result.error) throw new Error(`${source}: ${run.result.error}`)
+      if (run.result.skipped !== null) throw new Error(`${source}: skipped (${run.result.skipped})`)
+      return run.res!
+    },
+    retry: () => {
+      if (phase !== 'post') throw new Error('milka.retry() is only available in post-response scripts')
+      const ignored = (message: string): void => void logs.push({ level: 'warn', source: 'retry', message })
+      if (depth > 0) ignored('milka.retry() ignored in a request run by milka.runRequest()')
+      else if (retried) ignored('milka.retry() ignored: the request was already retried')
+      else retryRequested = true
+    },
     skip: (reason) => {
       throw new SkipSignal(reason ?? 'Skipped by the pre-request script')
     },
@@ -358,113 +404,134 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
       decode: (b64) => Buffer.from(b64, 'base64').toString('utf8')
     }
   }
-  const scope: ScriptScope = { req, milka }
   const levels: { label: string; scripts: { pre: string; post: string }; tests: string }[] = [
     { label: 'collection', scripts: collection.scripts, tests: collection.tests },
     ...folders.map((f) => ({ label: `folder ${f.name}`, scripts: f.scripts, tests: f.tests })),
     { label: 'request', scripts: request.scripts, tests: request.tests }
   ]
+  let scope!: ScriptScope
 
-  // Pre-request scripts.
-  try {
-    for (const level of levels) await runScript(level.scripts.pre, scope, { source: `pre-request (${level.label})`, logs })
-  } catch (error) {
-    if (error instanceof SkipSignal) {
-      result.skipped = error.reason
-      return done()
-    }
-    result.error = (error as Error).message
-    logs.push({ level: 'error', source: 'pre-request', message: result.error })
-    return done()
-  }
+  /** One send, from the pre-request scripts to the tests; fills `result`. */
+  const pass = async (): Promise<void> => {
+    const req = scriptRequest()
+    const tests: TestResult[] = []
+    scope = { req, milka }
+    Object.assign(result, { request: null, response: null, error: null, skipped: null, tests })
 
-  // Build and send.
-  let prepared: PreparedRequest
-  try {
-    const finalHeaders: Record<string, string> = {}
-    for (const [name, value] of Object.entries(req.headers)) finalHeaders[vars.interpolate(name)] = vars.interpolate(String(value))
-    let url = normalizeUrl(vars.interpolate(req.url))
-    const auth = resolveAuth(request, folders, collection)
-    if (auth.type === 'basic' && !hasHeader(finalHeaders, 'authorization')) {
-      const token = Buffer.from(`${vars.interpolate(auth.username)}:${vars.interpolate(auth.password)}`).toString('base64')
-      finalHeaders.Authorization = `Basic ${token}`
-    } else if (auth.type === 'bearer' && !hasHeader(finalHeaders, 'authorization')) {
-      finalHeaders.Authorization = `Bearer ${vars.interpolate(auth.token)}`
-    } else if (auth.type === 'apikey' && auth.key) {
-      const key = vars.interpolate(auth.key)
-      const value = vars.interpolate(auth.value)
-      if (auth.in === 'query') {
-        const parsed = new URL(url)
-        parsed.searchParams.set(key, value)
-        url = parsed.toString()
-      } else if (!hasHeader(finalHeaders, key)) finalHeaders[key] = value
-    }
-    const encoded = encodeBody(body, req.body, vars, store.root)
-    const contentType = body ? CONTENT_TYPES[body.type] : undefined
-    if (encoded.body !== undefined && contentType && !hasHeader(finalHeaders, 'content-type')) finalHeaders['Content-Type'] = contentType
-    if (!hasHeader(finalHeaders, 'user-agent')) finalHeaders['User-Agent'] = 'Milka'
-    prepared = {
-      method: (req.method || 'GET').toUpperCase(),
-      url,
-      headers: Object.entries(finalHeaders),
-      body: encoded.body,
-      timeoutMs: request.settings.timeout || DEFAULT_TIMEOUT_MS,
-      followRedirects: request.settings.followRedirects,
-      maxRedirects: request.settings.maxRedirects
-    }
-    result.request = { method: prepared.method, url, headers: prepared.headers, body: encoded.preview, bodyName: body?.name ?? null }
-  } catch (error) {
-    result.error = (error as Error).message
-    return done()
-  }
-
-  let raw: RawResponse
-  try {
-    raw = await send(prepared, { insecure: options.insecure, signal: options.signal, cookies })
-  } catch (error) {
-    result.error = (error as Error).message
-    return done()
-  }
-  // Shows the Cookie header the jar added.
-  if (result.request) result.request = { ...result.request, headers: raw.requestHeaders }
-  const contentType = raw.headers.find(([name]) => name.toLowerCase() === 'content-type')?.[1] ?? ''
-  const decoded = decodeBody(raw.body, contentType)
-  result.response = {
-    status: raw.status,
-    statusText: raw.statusText,
-    headers: raw.headers,
-    body: decoded.body,
-    encoding: decoded.encoding,
-    contentType,
-    size: raw.body.length,
-    url: raw.url,
-    redirects: raw.redirects,
-    timings: raw.timings
-  }
-  scope.res = toScriptResponse(raw, decoded.encoding === 'utf8' ? decoded.body : '')
-
-  // Post-response variables, scripts, assertions and tests.
-  for (const row of request.vars.post) {
-    if (!row.enabled || !row.name || !row.value.trim()) continue
+    // Pre-request scripts.
+    phase = 'pre'
     try {
-      options.runtime[row.name] = stringify(evaluate(row.value, scope))
+      for (const level of levels) await runScript(level.scripts.pre, scope, { source: `pre-request (${level.label})`, logs })
     } catch (error) {
-      logs.push({ level: 'error', source: 'post-response vars', message: `${row.name}: ${(error as Error).message}` })
+      if (error instanceof SkipSignal) {
+        result.skipped = error.reason
+        return
+      }
+      result.error = (error as Error).message
+      logs.push({ level: 'error', source: 'pre-request', message: result.error })
+      return
     }
-  }
-  try {
-    for (const level of levels) await runScript(level.scripts.post, scope, { source: `post-response (${level.label})`, logs, tests })
-  } catch (error) {
-    result.error = (error as Error).message
-    logs.push({ level: 'error', source: 'post-response', message: result.error })
-  }
-  tests.unshift(...runAssertions(request.assertions, scope))
-  for (const level of levels) {
+
+    // Build and send.
+    let prepared: PreparedRequest
     try {
-      await runScript(level.tests, scope, { source: `tests (${level.label})`, logs, tests })
+      const finalHeaders: Record<string, string> = {}
+      for (const [name, value] of Object.entries(req.headers)) finalHeaders[vars.interpolate(name)] = vars.interpolate(String(value))
+      let url = normalizeUrl(vars.interpolate(req.url))
+      const auth = resolveAuth(request, folders, collection)
+      if (auth.type === 'basic' && !hasHeader(finalHeaders, 'authorization')) {
+        const token = Buffer.from(`${vars.interpolate(auth.username)}:${vars.interpolate(auth.password)}`).toString('base64')
+        finalHeaders.Authorization = `Basic ${token}`
+      } else if (auth.type === 'bearer' && !hasHeader(finalHeaders, 'authorization')) {
+        finalHeaders.Authorization = `Bearer ${vars.interpolate(auth.token)}`
+      } else if (auth.type === 'apikey' && auth.key) {
+        const key = vars.interpolate(auth.key)
+        const value = vars.interpolate(auth.value)
+        if (auth.in === 'query') {
+          const parsed = new URL(url)
+          parsed.searchParams.set(key, value)
+          url = parsed.toString()
+        } else if (!hasHeader(finalHeaders, key)) finalHeaders[key] = value
+      }
+      const encoded = encodeBody(body, req.body, vars, store.root)
+      const contentType = body ? CONTENT_TYPES[body.type] : undefined
+      if (encoded.body !== undefined && contentType && !hasHeader(finalHeaders, 'content-type')) finalHeaders['Content-Type'] = contentType
+      if (!hasHeader(finalHeaders, 'user-agent')) finalHeaders['User-Agent'] = 'Milka'
+      prepared = {
+        method: (req.method || 'GET').toUpperCase(),
+        url,
+        headers: Object.entries(finalHeaders),
+        body: encoded.body,
+        timeoutMs: request.settings.timeout || DEFAULT_TIMEOUT_MS,
+        followRedirects: request.settings.followRedirects,
+        maxRedirects: request.settings.maxRedirects
+      }
+      result.request = { method: prepared.method, url, headers: prepared.headers, body: encoded.preview, bodyName: body?.name ?? null }
     } catch (error) {
-      tests.push({ name: `tests (${level.label})`, passed: false, error: (error as Error).message, kind: 'test' })
+      result.error = (error as Error).message
+      return
+    }
+
+    let raw: RawResponse
+    try {
+      raw = await send(prepared, { insecure: options.insecure, signal: options.signal, cookies })
+    } catch (error) {
+      result.error = (error as Error).message
+      return
+    }
+    // Shows the Cookie header the jar added.
+    if (result.request) result.request = { ...result.request, headers: raw.requestHeaders }
+    const contentType = raw.headers.find(([name]) => name.toLowerCase() === 'content-type')?.[1] ?? ''
+    const decoded = decodeBody(raw.body, contentType)
+    result.response = {
+      status: raw.status,
+      statusText: raw.statusText,
+      headers: raw.headers,
+      body: decoded.body,
+      encoding: decoded.encoding,
+      contentType,
+      size: raw.body.length,
+      url: raw.url,
+      redirects: raw.redirects,
+      timings: raw.timings
+    }
+    scope.res = toScriptResponse(raw, decoded.encoding === 'utf8' ? decoded.body : '')
+
+    // Post-response variables, scripts, assertions and tests.
+    phase = 'post'
+    for (const row of request.vars.post) {
+      if (!row.enabled || !row.name || !row.value.trim()) continue
+      try {
+        options.runtime[row.name] = stringify(evaluate(row.value, scope))
+      } catch (error) {
+        logs.push({ level: 'error', source: 'post-response vars', message: `${row.name}: ${(error as Error).message}` })
+      }
+    }
+    try {
+      for (const level of levels) await runScript(level.scripts.post, scope, { source: `post-response (${level.label})`, logs, tests })
+    } catch (error) {
+      result.error = (error as Error).message
+      logs.push({ level: 'error', source: 'post-response', message: result.error })
+    }
+    // The second send is the one tested.
+    if (retryRequested && !retried) return
+    phase = 'tests'
+    tests.unshift(...runAssertions(request.assertions, scope))
+    for (const level of levels) {
+      try {
+        await runScript(level.tests, scope, { source: `tests (${level.label})`, logs, tests })
+      } catch (error) {
+        tests.push({ name: `tests (${level.label})`, passed: false, error: (error as Error).message, kind: 'test' })
+      }
     }
   }
-  return done()
+
+  await pass()
+  if (retryRequested) {
+    retried = true
+    result.retried = true
+    logs.push({ level: 'info', source: 'retry', message: `Retried after ${scope.res?.status ?? 'an error'}` })
+    await pass()
+  }
+  return { result: { ...result, durationMs: Math.round(performance.now() - started) }, res: scope.res }
 }

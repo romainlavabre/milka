@@ -117,7 +117,14 @@ test('created', () => {
 
 - `req`: `method`, `url`, `headers`, `body` (parsed JSON for JSON bodies), `bodyName`, `setHeader()`, `removeHeader()`.
 - `res`: `status`, `headers`, `body` (parsed JSON), `text`, `time`, `size`, `header()`.
-- `milka`: `vars.get/set/has/delete`, `env.name/get`, `cookies`, `sendRequest()`, `skip()`, `uuid()`, `sleep()`, `base64`.
+- `milka`: `vars.get/set/has/delete`, `env.name/get`, `cookies`, `sendRequest()`, `runRequest(path, { body })`, `retry()`,
+  `skip()`, `uuid()`, `sleep()`, `base64`.
+- `milka.runRequest(path)` executes a request of the same collection (`service-auth/token.yaml`) with its inherited
+  headers, auth and scripts, and returns its response. It shares the variables, environment and cookie jar of the
+  current request, shows its logs in the console and keeps its tests to itself; it throws when the request fails, and
+  nests 3 levels deep at most.
+- `milka.retry()`, in post-response scripts only, sends the request once more after every post-response script, from its
+  pre-request scripts on. Once per execution: the result is the one of the second send, marked **Retried**.
 - `milka.cookies`: `get(url, name)`, `getAll(url)`, `set(url, name, value, { path, domain, expires, secure, httpOnly })`,
   `delete(url, name)`, `clear(url?)`; `url` is any URL of the site, `{{variables}}` allowed.
 - `test(name, fn)` and `expect(value)`: `toBe`, `toEqual`, `toBeDefined`, `toContain`, `toMatch`, `toHaveLength`,
@@ -129,6 +136,22 @@ scripts of a `package.json`: only open workspaces you trust.
 Cookies work as in a browser: the ones a response sets (redirects included) are sent back to the requests they match,
 by domain, path, expiry and `Secure`. The app keeps them per workspace until it quits, never on disk; the cookie button
 of the request bar lists them and deletes them. A run, `milka run` and each MCP session start with an empty jar.
+
+To refresh an expired token carried by a cookie, let the post-response script of the `Token` request store it:
+
+```ts
+// service-auth/token.yaml, post-response
+milka.cookies.set(milka.env.get('host'), 'ACCESS_TOKEN', res.body.access_token)
+```
+
+and the post-response script of the collection run it and send the request again on 401:
+
+```ts
+if (res.status === 401 && req.name !== 'Token') {
+  await milka.runRequest('service-auth/token.yaml')
+  milka.retry()
+}
+```
 
 The **Assert** tab covers the common checks without code: `res.status equals 201`, `res.body.id exists`,
 `res.headers['content-type'] contains json`.
