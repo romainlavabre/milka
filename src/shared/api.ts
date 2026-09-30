@@ -3,7 +3,8 @@
 // Every method takes a single object argument (validated with zod in main) and
 // is exposed on channel `${domain}:${method}`.
 import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '../core/model'
-import type { ConflictChoice, EnvironmentDraft, SyncStatus, WorkspaceRepo, WorkspaceState } from './types'
+import type { ExecutionResult } from '../core/results'
+import type { AppSettings, ConflictChoice, EnvironmentDraft, SyncStatus, WorkspaceRepo, WorkspaceState } from './types'
 
 export interface AppInfo {
   version: string
@@ -49,8 +50,28 @@ export interface Api {
     save(args: { collection: string; env: string | null; data: Environment; secretValues: Record<string, string> }): Promise<string>
     remove(args: { collection: string; env: string }): Promise<void>
   }
+  http: {
+    /** Sends a request of the active workspace; `request` is the unsaved draft. */
+    send(args: {
+      requestId: string
+      collection: string
+      path: string
+      request?: HttpRequest
+      bodyName?: string | null
+      env: string | null
+    }): Promise<ExecutionResult>
+    cancel(args: { requestId: string }): Promise<void>
+    /** Variables set by scripts during this session. */
+    runtimeVars(): Promise<Record<string, string>>
+    clearRuntimeVars(): Promise<void>
+  }
+  settings: {
+    get(): Promise<AppSettings>
+    set(args: Partial<AppSettings>): Promise<AppSettings>
+  }
   dialog: {
     openDirectory(args: { title: string }): Promise<string | null>
+    openFile(args: { title: string; filters?: { name: string; extensions: string[] }[] }): Promise<string | null>
   }
   app: {
     info(): Promise<AppInfo>
@@ -83,7 +104,9 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
     'move'
   ],
   environments: ['list', 'get', 'save', 'remove'],
-  dialog: ['openDirectory'],
+  http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars'],
+  settings: ['get', 'set'],
+  dialog: ['openDirectory', 'openFile'],
   app: ['info']
 }
 

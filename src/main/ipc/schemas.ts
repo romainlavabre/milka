@@ -45,8 +45,26 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     save: z.object({ collection, env: env.nullable(), data: environmentSchema, secretValues: z.record(z.string(), z.string()) }),
     remove: z.object({ collection, env })
   },
+  http: {
+    send: z.object({
+      requestId: z.string().min(1),
+      collection,
+      path: nodePath,
+      request: requestSchema.optional(),
+      bodyName: z.string().nullable().optional(),
+      env: env.nullable()
+    }),
+    cancel: z.object({ requestId: z.string() }),
+    runtimeVars: none,
+    clearRuntimeVars: none
+  },
+  settings: {
+    get: none,
+    set: z.object({ insecureTls: z.boolean().optional() })
+  },
   dialog: {
-    openDirectory: z.object({ title: z.string() })
+    openDirectory: z.object({ title: z.string() }),
+    openFile: z.object({ title: z.string(), filters: z.array(z.object({ name: z.string(), extensions: z.array(z.string()) })).optional() })
   },
   app: {
     info: none

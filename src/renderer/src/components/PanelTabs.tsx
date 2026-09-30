@@ -24,7 +24,7 @@ export function PanelTabs<T extends string>({
 }) {
   return (
     <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-2">
-      <div role="tablist" className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
+      <div role="tablist" className="no-scrollbar flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}

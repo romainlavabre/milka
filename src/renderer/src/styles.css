@@ -88,6 +88,11 @@ select,
   background: transparent;
 }
 
+/* Scrollable strips (tabs) without a visible scrollbar. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Resize handles of react-resizable-panels. */
 .resize-handle {
   background: var(--border);

@@ -5,7 +5,9 @@ import type { ZodType } from 'zod'
 import { API_METHODS, type Api, type ApiEvents } from '@shared/api'
 import { createHandlers } from './ipc/handlers'
 import { schemas } from './ipc/schemas'
+import { ExecutionService } from './execution'
 import { SecretStore, createCipher } from './secrets'
+import { SettingsStore } from './settings'
 import { ContentService } from './workspace/content'
 import { WorkspaceManager } from './workspace/manager'
 
@@ -106,8 +108,10 @@ void app.whenReady().then(() => {
   })
 
   const content = new ContentService(workspace, secrets)
+  const settings = new SettingsStore(join(dataDir, 'settings.json'))
+  const execution = new ExecutionService(workspace, content, settings)
 
-  registerIpc(createHandlers({ workspace, content, window: () => mainWindow, secretsEncrypted }))
+  registerIpc(createHandlers({ workspace, content, execution, settings, window: () => mainWindow, secretsEncrypted }))
   createWindow()
 
   let quitting = false

@@ -20,5 +20,13 @@
       "@/*": ["./src/renderer/src/*"]
     }
   },
-  "include": ["src/renderer/src/**/*", "src/shared/**/*", "src/core/model.ts", "src/preload/*.d.ts"]
+  "include": [
+    "src/renderer/src/**/*",
+    "src/shared/**/*",
+    "src/core/model.ts",
+    "src/core/results.ts",
+    "src/core/url.ts",
+    "src/core/assert-labels.ts",
+    "src/preload/*.d.ts"
+  ]
 }

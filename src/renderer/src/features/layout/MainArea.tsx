@@ -29,7 +29,7 @@ export function MainArea() {
   return (
     <div className="flex h-full min-w-0 flex-col">
       {tabs.length > 0 && (
-        <div className="flex h-9 shrink-0 items-end gap-px overflow-x-auto border-b border-border bg-panel">
+        <div className="no-scrollbar flex h-9 shrink-0 items-end gap-px overflow-x-auto border-b border-border bg-panel">
           {tabs.map((tab) => (
             <TabButton key={tab.id} tab={tab} active={tab.id === activeTabId} />
           ))}

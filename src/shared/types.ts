@@ -39,3 +39,8 @@ export interface SyncStatus {
 }
 
 export type ConflictChoice = 'mine' | 'theirs'
+
+export interface AppSettings {
+  /** Accept invalid TLS certificates (self-signed development servers). */
+  insecureTls: boolean
+}
