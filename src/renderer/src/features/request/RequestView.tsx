@@ -38,6 +38,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
     queryKey: ['request', collection, path],
     load: () => api.collections.getRequest({ collection, path }),
     tabId: id,
+    describe: (request) => ({ kind: 'Request', title: request.name, location: `${collection} / ${path}` }),
     save: async (data) => {
       const saved = await api.collections.saveRequest({ collection, parent: parentOf(path), path, data })
       queryClient.setQueryData(['request', collection, saved], data)

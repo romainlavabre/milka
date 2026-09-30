@@ -98,7 +98,8 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     })
   },
   app: {
-    info: none
+    info: none,
+    close: none
   },
   update: {
     status: none,

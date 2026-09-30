@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { FolderOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { api, errorMessage } from '../../lib/bridge'
+import { allDrafts } from '../../lib/drafts'
+import { askUnsaved } from '../layout/UnsavedChanges'
 import { toast } from '../../components/feedback'
 import { Button, Dialog, ErrorBox, Field, IconButton, Input, SegmentedControl } from '../../components/ui'
 
@@ -45,6 +47,8 @@ export function AddWorkspaceDialog({ open, onOpenChange }: { open: boolean; onOp
   }
 
   const submit = async (): Promise<void> => {
+    // The new workspace becomes the active one: unsaved changes belong to the current one.
+    if (!(await askUnsaved(allDrafts(), 'Switch'))) return
     setBusy(true)
     setError(null)
     try {

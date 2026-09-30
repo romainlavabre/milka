@@ -1,6 +1,7 @@
 // UI state: open tabs and the environment selected per collection.
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { clearDrafts, draftsOfTab, forgetDraft } from './lib/drafts'
 
 export type TabKind = 'request' | 'collection' | 'folder' | 'runner'
 
@@ -15,15 +16,13 @@ export interface Tab {
 interface AppState {
   tabs: Tab[]
   activeTabId: string | null
-  /** Tabs with unsaved changes. */
-  dirty: Record<string, boolean>
   /** Selected environment slug per `<repoId>:<collection>`. */
   environments: Record<string, string | null>
   theme: 'dark' | 'light'
 }
 
 export const useApp = create<AppState>()(
-  persist(() => ({ tabs: [], activeTabId: null, dirty: {}, environments: {}, theme: 'dark' as const }) as AppState, {
+  persist(() => ({ tabs: [], activeTabId: null, environments: {}, theme: 'dark' as const }) as AppState, {
     name: 'milka-ui',
     partialize: (s) => ({ environments: s.environments, theme: s.theme })
   })
@@ -41,7 +40,9 @@ export function openTab(kind: TabKind, collection: string, path = ''): void {
   }))
 }
 
+/** Closes a tab and forgets its unsaved changes: ask first with closeTabSafely. */
 export function closeTab(id: string): void {
+  for (const draft of draftsOfTab(id)) forgetDraft(draft.id)
   useApp.setState((s) => {
     const index = s.tabs.findIndex((t) => t.id === id)
     const tabs = s.tabs.filter((t) => t.id !== id)
@@ -50,7 +51,7 @@ export function closeTab(id: string): void {
   })
 }
 
-/** Closes every tab of a collection, or of the node at `path` and below. */
+/** Closes every tab of a collection, or of the node at `path` and below (deleted: their changes are dropped). */
 export function closeTabsUnder(collection: string, path?: string): void {
   for (const tab of useApp.getState().tabs) {
     if (tab.collection !== collection) continue
@@ -81,12 +82,8 @@ export function retargetTabs(collection: string, from: string, to: string, toCol
 }
 
 export function closeAllTabs(): void {
-  useApp.setState({ tabs: [], activeTabId: null, dirty: {} })
-}
-
-export function setDirty(id: string, dirty: boolean): void {
-  if ((useApp.getState().dirty[id] ?? false) === dirty) return
-  useApp.setState((s) => ({ dirty: { ...s.dirty, [id]: dirty } }))
+  clearDrafts()
+  useApp.setState({ tabs: [], activeTabId: null })
 }
 
 export function selectedEnvironment(repoId: string, collection: string): string | null {

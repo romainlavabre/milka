@@ -22,6 +22,7 @@ export function CollectionView({ collection }: { collection: string }) {
     queryKey: ['collection', collection],
     load: () => api.collections.get({ collection }),
     tabId: tabId('collection', collection),
+    describe: (value) => ({ kind: 'Collection', title: value.name, location: collection }),
     save: async (data) => {
       const slug = await api.collections.save({ collection, data })
       if (slug !== collection) retargetTabs(collection, '', '', slug)

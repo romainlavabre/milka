@@ -30,6 +30,8 @@ if (process.env.SNAP_NAME && !(process.env.SNAP && process.execPath.startsWith(p
 }
 
 let mainWindow: BrowserWindow | null = null
+/** Closes the main window without asking the renderer about unsaved changes again. */
+let closeWindow = (): void => undefined
 
 function send<E extends keyof ApiEvents>(event: E, payload: ApiEvents[E]): void {
   mainWindow?.webContents.send(event, payload)
@@ -64,6 +66,19 @@ function createWindow(): void {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+  // The renderer knows the unsaved changes: it asks about them, then calls app.close.
+  // A renderer that crashed or is still loading has nothing to ask.
+  const window = mainWindow
+  let closeConfirmed = false
+  window.on('close', (event) => {
+    if (closeConfirmed || window.webContents.isCrashed() || window.webContents.isLoading()) return
+    event.preventDefault()
+    window.webContents.send('app:close-requested', {})
+  })
+  closeWindow = () => {
+    closeConfirmed = true
+    window.close()
+  }
   // Links open in the browser, never inside the app.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url)
@@ -176,6 +191,7 @@ function ready(): void {
       settings,
       updater,
       window: () => mainWindow,
+      closeWindow: () => closeWindow(),
       secretsEncrypted,
       events: { runnerCase: (payload) => send('runner:case', payload) }
     })

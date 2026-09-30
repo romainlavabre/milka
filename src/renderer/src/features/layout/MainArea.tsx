@@ -1,9 +1,11 @@
 // Tab bar and content of the open tabs.
 import clsx from 'clsx'
 import { FileText, Folder as FolderIcon, Layers, Play, X } from 'lucide-react'
+import { useTabDirty } from '../../lib/drafts'
 import { useShortcut } from '../../lib/shortcuts'
 import { EmptyState } from '../../components/ui'
-import { closeTab, useApp, type Tab } from '../../store'
+import { useApp, type Tab } from '../../store'
+import { closeTabSafely } from './UnsavedChanges'
 import { findNode, methodColor, useCollections } from '../collections/useCollections'
 import { CollectionView } from '../collections/CollectionView'
 import { FolderView } from '../collections/FolderView'
@@ -15,7 +17,7 @@ export function MainArea() {
   const activeTabId = useApp((s) => s.activeTabId)
   const active = tabs.find((t) => t.id === activeTabId) ?? null
 
-  useShortcut('w', () => activeTabId && closeTab(activeTabId))
+  useShortcut('w', () => activeTabId && void closeTabSafely(activeTabId))
 
   return (
     <div className="flex h-full min-w-0 flex-col">
@@ -56,8 +58,8 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
   const { data: collections } = useCollections()
   const collection = collections?.find((c) => c.slug === tab.collection)
   const node = tab.path ? findNode(collection?.children ?? [], tab.path) : undefined
-  // A tab is dirty when its editor, or one of its sub-editors (`<id>#…`), has unsaved changes.
-  const dirty = useApp((s) => Object.entries(s.dirty).some(([key, value]) => value && (key === tab.id || key.startsWith(`${tab.id}#`))))
+  // A tab is dirty when its editor, or one of the editors inside it, has unsaved changes.
+  const dirty = useTabDirty(tab.id)
 
   let icon = <FileText className="size-3.5 text-muted" />
   let title = node?.name ?? tab.path
@@ -85,7 +87,7 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
       )}
       style={active ? { borderTopColor: collection?.color ?? 'var(--accent)' } : undefined}
       onClick={() => useApp.setState({ activeTabId: tab.id })}
-      onAuxClick={(e) => e.button === 1 && closeTab(tab.id)}
+      onAuxClick={(e) => e.button === 1 && void closeTabSafely(tab.id)}
       title={`${collection?.name ?? tab.collection}${tab.path ? ` / ${tab.path}` : ''}`}
     >
       {!active && collection && <span className="size-1.5 shrink-0 rounded-full" style={{ background: collection.color }} />}
@@ -96,7 +98,7 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
         aria-label="Close tab"
         onClick={(e) => {
           e.stopPropagation()
-          closeTab(tab.id)
+          void closeTabSafely(tab.id)
         }}
       >
         {dirty ? <span className="block size-2 rounded-full bg-fg group-hover:hidden" /> : null}

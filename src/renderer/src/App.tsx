@@ -7,6 +7,7 @@ import { DialogHost, Toaster } from './components/feedback'
 import { Button, EmptyState } from './components/ui'
 import { CollectionTree } from './features/collections/CollectionTree'
 import { MainArea } from './features/layout/MainArea'
+import { UnsavedChanges } from './features/layout/UnsavedChanges'
 import { UpdateBadge, UpdateNotice } from './features/update/UpdateNotice'
 import { AddWorkspaceDialog } from './features/workspace/AddWorkspaceDialog'
 import { WorkspaceSwitcher } from './features/workspace/WorkspaceSwitcher'
@@ -32,6 +33,7 @@ export function App() {
         </Panel>
       </Group>
       <UpdateNotice />
+      <UnsavedChanges />
       <Toaster />
       <DialogHost />
     </RadixTooltip.Provider>

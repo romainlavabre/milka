@@ -14,11 +14,23 @@ export interface Services {
   settings: SettingsStore
   updater: Updater
   window(): BrowserWindow | null
+  /** Closes the window without asking the renderer again. */
+  closeWindow(): void
   secretsEncrypted(): boolean
   events: { runnerCase(payload: ApiEvents['runner:case']): void }
 }
 
-export function createHandlers({ workspace, content, execution, settings, updater, window, secretsEncrypted, events }: Services): Api {
+export function createHandlers({
+  workspace,
+  content,
+  execution,
+  settings,
+  updater,
+  window,
+  closeWindow,
+  secretsEncrypted,
+  events
+}: Services): Api {
   return {
     workspace: {
       async state() {
@@ -145,6 +157,9 @@ export function createHandlers({ workspace, content, execution, settings, update
     app: {
       async info() {
         return { version: app.getVersion(), platform: process.platform, secretsEncrypted: secretsEncrypted() }
+      },
+      async close() {
+        closeWindow()
       }
     },
     update: {

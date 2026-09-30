@@ -111,6 +111,8 @@ export interface Api {
   }
   app: {
     info(): Promise<AppInfo>
+    /** Closes the window, once the renderer dealt with the unsaved changes. */
+    close(): Promise<void>
   }
   update: {
     status(): Promise<UpdateStatus>
@@ -130,9 +132,18 @@ export interface ApiEvents {
   'workspace:files': { repoId: string }
   'runner:case': { runId: string; runCase: RunCase; index: number; total: number }
   'update:status': UpdateStatus
+  /** The window is about to close: the renderer asks about unsaved changes, then calls app.close. */
+  'app:close-requested': Record<string, never>
 }
 
-export const API_EVENTS: (keyof ApiEvents)[] = ['workspace:status', 'workspace:changed', 'workspace:files', 'runner:case', 'update:status']
+export const API_EVENTS: (keyof ApiEvents)[] = [
+  'workspace:status',
+  'workspace:changed',
+  'workspace:files',
+  'runner:case',
+  'update:status',
+  'app:close-requested'
+]
 
 /** Method names per domain, used by the preload script to build the bridge. */
 export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
@@ -159,7 +170,7 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
   runner: ['run', 'cancel'],
   settings: ['get', 'set'],
   dialog: ['openDirectory', 'openFile', 'saveFile'],
-  app: ['info'],
+  app: ['info', 'close'],
   update: ['status', 'install', 'openTerminal', 'restart']
 }
 

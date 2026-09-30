@@ -5,6 +5,8 @@ import { Check, ChevronsUpDown, FolderGit2, Link2, Pencil, Plus, Trash2 } from '
 import { useState } from 'react'
 import type { WorkspaceRepo } from '@shared/types'
 import { api, errorMessage } from '../../lib/bridge'
+import { allDrafts } from '../../lib/drafts'
+import { askUnsaved } from '../layout/UnsavedChanges'
 import { confirm, prompt, toast } from '../../components/feedback'
 import { AddWorkspaceDialog } from './AddWorkspaceDialog'
 import { useWorkspace } from './useWorkspace'
@@ -28,7 +30,11 @@ export function WorkspaceSwitcher() {
     }
   }
 
-  const switchTo = (repo: WorkspaceRepo): Promise<void> => run(() => api.workspace.activate({ repoId: repo.id }))
+  // Unsaved changes are written to the active workspace: deal with them before leaving it.
+  const switchTo = async (repo: WorkspaceRepo): Promise<void> => {
+    if (repo.id === data?.activeRepoId || !(await askUnsaved(allDrafts(), 'Switch'))) return
+    await run(() => api.workspace.activate({ repoId: repo.id }))
+  }
 
   const rename = async (repo: WorkspaceRepo): Promise<void> => {
     const name = await prompt({ title: 'Rename workspace', label: 'Name', initial: repo.name, confirmLabel: 'Rename' })
@@ -59,7 +65,8 @@ export function WorkspaceSwitcher() {
       confirmLabel: 'Remove',
       danger: true
     })
-    if (ok) await run(() => api.workspace.remove({ repoId: repo.id, deleteFiles: true }))
+    if (!ok || (repo.id === data?.activeRepoId && !(await askUnsaved(allDrafts(), 'Remove')))) return
+    await run(() => api.workspace.remove({ repoId: repo.id, deleteFiles: true }))
   }
 
   return (

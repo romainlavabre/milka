@@ -20,7 +20,9 @@ export async function launch(): Promise<Launched> {
     page,
     root,
     async close() {
-      await app.close()
+      // Destroying the window skips the unsaved-changes question a test may have left open.
+      await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().forEach((w) => w.destroy())).catch(() => undefined)
+      await app.close().catch(() => undefined)
       rmSync(root, { recursive: true, force: true })
     }
   }

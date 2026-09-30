@@ -7,11 +7,12 @@ import { useEffect, useState } from 'react'
 import { newEnvironment, type Environment } from '@core/model'
 import type { EnvironmentDraft } from '@shared/types'
 import { api, errorMessage } from '../../lib/bridge'
-import { useShortcut } from '../../lib/shortcuts'
+import { forgetDraft } from '../../lib/drafts'
+import { useDraft } from '../../lib/useDraft'
 import { confirm, prompt, toast } from '../../components/feedback'
 import { useRowReorder } from '../../components/reorder'
 import { Button, EmptyState, IconButton, Input, Spinner } from '../../components/ui'
-import { selectEnvironment, setDirty, tabId } from '../../store'
+import { selectEnvironment, tabId } from '../../store'
 import { useActiveRepo } from '../workspace/useWorkspace'
 import { useEnvironments } from './EnvironmentSelect'
 
@@ -32,6 +33,13 @@ function toRows(draft: EnvironmentDraft): Row[] {
     .map((row, index) => ({ row, index }))
     .sort((a, b) => position(a.row) - position(b.row) || a.index - b.index)
     .map((r) => r.row)
+}
+
+/** What the environment editor edits. */
+interface EnvironmentValue {
+  name: string
+  rows: Row[]
+  secretsUnreadable: boolean
 }
 
 function fromRows(name: string, rows: Row[]): { data: Environment; secretValues: Record<string, string> } {
@@ -176,51 +184,32 @@ function EnvironmentEditor({
   onRenamed: (slug: string) => void
 }) {
   const queryClient = useQueryClient()
-  const { data, error } = useQuery({
+  const tab = tabId('collection', collection)
+  const { draft, setDraft, dirty, saving, save, error } = useDraft<EnvironmentValue>({
     queryKey: ['environment', collection, env],
-    queryFn: () => api.environments.get({ collection, env }),
-    staleTime: Infinity
-  })
-  const [name, setName] = useState('')
-  const [rows, setRows] = useState<Row[]>([])
-  const [baseline, setBaseline] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [revealed, setRevealed] = useState<Set<number>>(new Set())
-  const dirtyId = `${tabId('collection', collection)}#environment`
-
-  useEffect(() => {
-    if (!data) return
-    setName(data.environment.name)
-    setRows(toRows(data))
-    setBaseline(JSON.stringify([data.environment.name, toRows(data)]))
-  }, [data])
-
-  const dirty = !!data && JSON.stringify([name, rows]) !== baseline
-  useEffect(() => {
-    setDirty(dirtyId, dirty)
-  }, [dirty, dirtyId])
-  useEffect(() => () => setDirty(dirtyId, false), [dirtyId])
-
-  const save = async (): Promise<void> => {
-    if (!name.trim()) return
-    setSaving(true)
-    try {
-      const { data: environment, secretValues } = fromRows(name.trim(), rows)
+    load: async () => {
+      const loaded = await api.environments.get({ collection, env })
+      return { name: loaded.environment.name, rows: toRows(loaded), secretsUnreadable: loaded.secretsUnreadable }
+    },
+    tabId: tab,
+    id: `${tab}#environment:${env}`,
+    describe: (value) => ({ kind: 'Environment', title: value.name, location: `${collection} / environments` }),
+    // Also runs from the unsaved-changes dialogs, once this editor is closed.
+    save: async (value) => {
+      if (!value.name.trim()) throw new Error('The environment needs a name')
+      const { data: environment, secretValues } = fromRows(value.name.trim(), value.rows)
       const slug = await api.environments.save({ collection, env, data: environment, secretValues })
-      setBaseline(JSON.stringify([name, rows]))
+      queryClient.setQueryData(['environment', collection, slug], { ...value, rows: value.rows.filter((r) => r.name.trim()) })
       await queryClient.invalidateQueries({ queryKey: ['environments', collection] })
-      queryClient.removeQueries({ queryKey: ['environment', collection, env] })
       if (slug !== env) onRenamed(slug)
       toast(`Environment "${environment.name}" saved`, 'success')
-    } catch (e) {
-      toast(errorMessage(e), 'error')
-    } finally {
-      setSaving(false)
     }
-  }
-
-  // Saves the environment rather than the collection while it has changes.
-  useShortcut('s', () => void save(), dirty)
+  })
+  const [revealed, setRevealed] = useState<Set<number>>(new Set())
+  const name = draft?.name ?? ''
+  const rows = draft?.rows ?? []
+  const setName = (value: string): void => setDraft((current) => ({ ...current, name: value }))
+  const setRows = (value: Row[]): void => setDraft((current) => ({ ...current, rows: value }))
 
   const remove = async (): Promise<void> => {
     const ok = await confirm({
@@ -232,6 +221,7 @@ function EnvironmentEditor({
     if (!ok) return
     try {
       await api.environments.remove({ collection, env })
+      forgetDraft(`${tab}#environment:${env}`)
       await queryClient.invalidateQueries({ queryKey: ['environments', collection] })
     } catch (e) {
       toast(errorMessage(e), 'error')
@@ -245,7 +235,7 @@ function EnvironmentEditor({
   })
 
   if (error) return <div className="p-3 text-danger">{String(error)}</div>
-  if (!data) return <Spinner className="m-4" />
+  if (!draft) return <Spinner className="m-4" />
 
   const update = (index: number, patch: Partial<Row>): void => setRows(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   const cell = 'h-7 w-full bg-transparent px-2 font-mono text-xs outline-none placeholder:text-muted/60 focus:bg-panel-2'
@@ -273,7 +263,7 @@ function EnvironmentEditor({
         </Button>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-3">
-        {data.secretsUnreadable && (
+        {draft.secretsUnreadable && (
           <div className="mb-3 rounded-md border border-danger/40 bg-danger/10 p-2 text-xs text-danger">
             The secret values saved on this machine cannot be decrypted (the system keyring changed). They are kept in case it comes back;
             type them again to replace them.

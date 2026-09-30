@@ -24,6 +24,7 @@ import { api, errorMessage } from '../../lib/bridge'
 import { confirm, prompt, toast } from '../../components/feedback'
 import { EmptyState, IconButton } from '../../components/ui'
 import { closeTabsUnder, openTab, retargetTabs, tabId, useApp } from '../../store'
+import { askUnsaved, draftsUnder } from '../layout/UnsavedChanges'
 import { menuContentClass, menuItemClass } from '../workspace/WorkspaceSwitcher'
 import { ImportDialog } from './ImportDialog'
 import { methodColor, parentOf, useCollections, useRefreshContent } from './useCollections'
@@ -138,6 +139,8 @@ function CollectionRow({ collection }: { collection: CollectionSummary }) {
   const rename = async (): Promise<void> => {
     const name = await prompt({ title: 'Rename collection', label: 'Name', initial: collection.name, confirmLabel: 'Rename' })
     if (!name?.trim() || name.trim() === collection.name) return
+    // Renaming moves the files: pending changes are saved or dropped first.
+    if (!(await askUnsaved(draftsUnder(collection.slug), 'Rename'))) return
     const slug = await actions.run(async () =>
       api.collections.save({
         collection: collection.slug,
@@ -265,6 +268,7 @@ function NodeRow({ collection, node }: { collection: CollectionSummary; node: Tr
   const rename = async (): Promise<void> => {
     const name = await prompt({ title: `Rename ${node.kind}`, label: 'Name', initial: node.name, confirmLabel: 'Rename' })
     if (!name?.trim() || name.trim() === node.name) return
+    if (!(await askUnsaved(draftsUnder(slug, node.path), 'Rename'))) return
     const parent = parentOf(node.path)
     const path = await actions.run(async () =>
       node.kind === 'request'
@@ -434,6 +438,7 @@ function dropHandlers(
       }
       if (data.path === before || data.path === parent) return
       void run(async () => {
+        if (!(await askUnsaved(draftsUnder(collection, data.path), 'Move'))) return
         const path = await api.collections.move({ collection, from: data.path, parent, before })
         if (path !== data.path) retargetTabs(collection, data.path, path)
         onDropped?.()

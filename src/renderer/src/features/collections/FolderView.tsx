@@ -19,6 +19,7 @@ export function FolderView({ collection, path }: { collection: string; path: str
     queryKey: ['folder', collection, path],
     load: () => api.collections.getFolder({ collection, path }),
     tabId: tabId('folder', collection, path),
+    describe: (folder) => ({ kind: 'Folder', title: folder.name, location: `${collection} / ${path}` }),
     save: async (data) => {
       const saved = await api.collections.saveFolder({ collection, parent: parentOf(path), path, data })
       if (saved !== path) retargetTabs(collection, path, saved)
