@@ -89,6 +89,12 @@ runtime variables set by scripts, request variables, folder variables (innermost
 collection variables. `{{process.env.NAME}}`, `{{$uuid}}`, `{{$timestamp}}`, `{{$isoTimestamp}}` and `{{$randomInt}}`
 are built in.
 
+A variable shows green when it resolves and red when it does not. Hover it to see its value and where it comes from, and
+to change it there: the value is saved in that scope (a secret stays on your computer). An undefined variable is added
+to the selected environment, or to the request, folder or collection being edited when none is selected. In a JSON
+body, a variable may stand for a whole value without quotes, `"id": {{userId}}`: the editor accepts it and **Format**
+keeps it.
+
 Mark an environment variable as secret with its lock: the environment file keeps its name only, and each teammate types
 the value, stored encrypted with the system keyring (a local key file when there is no keyring) in
 `~/.config/milka/secrets.json`.

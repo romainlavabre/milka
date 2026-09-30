@@ -4,7 +4,17 @@
 // is exposed on channel `${domain}:${method}`.
 import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '../core/model'
 import type { CookieInfo, ExecutionResult, RunCase, RunSummary } from '../core/results'
-import type { AppSettings, ConflictChoice, EnvironmentDraft, SyncStatus, UpdateStatus, WorkspaceRepo, WorkspaceState } from './types'
+import type {
+  AppSettings,
+  ConflictChoice,
+  EnvironmentDraft,
+  SyncStatus,
+  UpdateStatus,
+  VariableTarget,
+  VisibleVariable,
+  WorkspaceRepo,
+  WorkspaceState
+} from './types'
 
 export interface AppInfo {
   version: string
@@ -45,8 +55,10 @@ export interface Api {
     move(args: { collection: string; from: string; parent: string; before: string | null }): Promise<string>
     /** Variable names known in a collection (for script autocompletion). */
     variableNames(args: { collection: string }): Promise<string[]>
-    /** Variable names a request of `folder` ('' for the root) resolves with `env`, runtime variables included. */
-    visibleVariables(args: { collection: string; folder: string; env: string | null }): Promise<string[]>
+    /** Variables a request of `folder` ('' for the root) resolves with `env`, runtime variables included. */
+    visibleVariables(args: { collection: string; folder: string; env: string | null }): Promise<VisibleVariable[]>
+    /** Sets a variable of the collection, a folder or an environment (its local value for a secret), adding it when missing. */
+    setVariable(args: { collection: string; target: VariableTarget; name: string; value: string }): Promise<void>
   }
   environments: {
     list(args: { collection: string }): Promise<EnvironmentSummary[]>
@@ -67,6 +79,8 @@ export interface Api {
     cancel(args: { requestId: string }): Promise<void>
     /** Variables set by scripts during this session. */
     runtimeVars(): Promise<Record<string, string>>
+    /** Sets a variable as a script would, until Milka quits. */
+    setRuntimeVar(args: { name: string; value: string }): Promise<void>
     clearRuntimeVars(): Promise<void>
     /** Cookies received during this session, in the active workspace. */
     cookies(): Promise<CookieInfo[]>
@@ -164,10 +178,11 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
     'removeRequest',
     'move',
     'variableNames',
-    'visibleVariables'
+    'visibleVariables',
+    'setVariable'
   ],
   environments: ['list', 'get', 'save', 'remove'],
-  http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars', 'cookies', 'deleteCookie', 'clearCookies'],
+  http: ['send', 'cancel', 'runtimeVars', 'setRuntimeVar', 'clearRuntimeVars', 'cookies', 'deleteCookie', 'clearCookies'],
   importer: ['collection', 'environment', 'curl'],
   exporter: ['openapi'],
   runner: ['run', 'cancel'],

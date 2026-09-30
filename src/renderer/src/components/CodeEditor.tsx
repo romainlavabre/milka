@@ -1,9 +1,10 @@
 // Monaco editor bound to a string value.
 import { useEffect, useRef } from 'react'
+import { jsonSyntaxError } from '@core/jsonTemplate'
 import { variableTokens } from '@core/varSyntax'
 import { monaco } from '../lib/monaco'
 import { useApp } from '../store'
-import { useVariableStatus, type VariableStatus } from './variables'
+import { useVariableHover, useVariableStatus, type VariableStatus } from './variables'
 
 export type CodeLanguage = 'json' | 'xml' | 'html' | 'plaintext' | 'typescript' | 'graphql' | 'markdown' | 'javascript'
 
@@ -37,8 +38,33 @@ export function CodeEditor({
   const variables = useRef<monaco.editor.IEditorDecorationsCollection | null>(null)
   const status = useVariableStatus()
   const statusRef = useRef<VariableStatus | null>(null)
+  const hovering = useVariableHover()
+  const hoverRef = useRef(hovering)
+  const checkJsonRef = useRef(false)
   onChangeRef.current = onChange
   statusRef.current = highlightVariables ? status : null
+  hoverRef.current = highlightVariables ? hovering : null
+  // Monaco's JSON validation is off: bodies are checked here, {{variables}} accepted.
+  checkJsonRef.current = language === 'json' && !readOnly
+
+  const checkJson = (): void => {
+    const model = editor.current?.getModel()
+    if (!model) return
+    const error = checkJsonRef.current ? jsonSyntaxError(model.getValue()) : null
+    monaco.editor.setModelMarkers(
+      model,
+      'milka-json',
+      error
+        ? [
+            {
+              ...monaco.Range.fromPositions(model.getPositionAt(error.start), model.getPositionAt(Math.max(error.end, error.start + 1))),
+              severity: monaco.MarkerSeverity.Error,
+              message: error.message
+            }
+          ]
+        : []
+    )
+  }
 
   const decorate = (): void => {
     const model = editor.current?.getModel()
@@ -83,12 +109,40 @@ export function CodeEditor({
     editor.current = instance
     variables.current = instance.createDecorationsCollection()
     decorate()
+    checkJson()
     const subscription = instance.onDidChangeModelContent(() => {
       decorate()
+      checkJson()
       onChangeRef.current?.(instance.getValue())
+    })
+    // The variable under the pointer, for the popover of the variable scope.
+    let pointed: string | null = null
+    const moving = instance.onMouseMove((e) => {
+      const hover = hoverRef.current
+      const position = e.target.position
+      const offset = position && e.target.type === monaco.editor.MouseTargetType.CONTENT_TEXT ? model.getOffsetAt(position) : -1
+      const token = hover && offset >= 0 ? variableTokens(model.getValue()).find((t) => offset >= t.start && offset < t.end) : undefined
+      const key = token ? `${token.start}:${token.name}` : null
+      if (key === pointed) return
+      pointed = key
+      if (!hover) return
+      if (!token) return hover.leave()
+      const start = model.getPositionAt(token.start)
+      const end = model.getPositionAt(token.end)
+      const from = instance.getScrolledVisiblePosition(start)
+      const to = instance.getScrolledVisiblePosition(end)
+      const box = instance.getDomNode()?.getBoundingClientRect()
+      if (!from || !to || !box) return
+      hover.hover(token.name, new DOMRect(box.left + from.left, box.top + from.top, Math.max(to.left - from.left, 1), from.height))
+    })
+    const leaving = instance.onMouseLeave(() => {
+      if (pointed) hoverRef.current?.leave()
+      pointed = null
     })
     return () => {
       subscription.dispose()
+      moving.dispose()
+      leaving.dispose()
       variables.current = null
       instance.dispose()
       model.dispose()
@@ -110,7 +164,8 @@ export function CodeEditor({
   useEffect(() => {
     const model = editor.current?.getModel()
     if (model) monaco.editor.setModelLanguage(model, language)
-  }, [language])
+    checkJson()
+  }, [language, readOnly])
 
   useEffect(() => {
     editor.current?.updateOptions({ readOnly, wordWrap: wordWrap ? 'on' : 'off' })

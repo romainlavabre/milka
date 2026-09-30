@@ -1,5 +1,6 @@
-// Monaco setup: bundled workers (no CDN), themes matching the app and the
-// TypeScript defaults used by pre-request / post-response scripts.
+// Monaco setup: bundled workers (no CDN), themes matching the app, the
+// TypeScript defaults used by pre-request / post-response scripts and JSON
+// validation left to CodeEditor.
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
 import JsonWorker from 'monaco-editor/language/json/json.worker?worker'
@@ -48,6 +49,10 @@ ts.typescriptDefaults.setCompilerOptions({
 })
 ts.typescriptDefaults.setDiagnosticsOptions({ noSemanticValidation: false, noSyntaxValidation: false })
 ts.typescriptDefaults.setEagerModelSync(true)
+
+// JSON bodies may hold unquoted {{variables}}, which the JSON worker reports as
+// errors: CodeEditor checks them with jsonSyntaxError instead.
+monaco.json.jsonDefaults.setDiagnosticsOptions({ validate: false })
 
 const extraLibs = new Map<string, monaco.IDisposable>()
 

@@ -9,6 +9,24 @@ export interface EnvironmentDraft {
   secretsUnreadable: boolean
 }
 
+/** Where a variable is written: the scopes a user can edit. */
+export type VariableTarget = { kind: 'collection' } | { kind: 'folder'; path: string } | { kind: 'environment'; env: string }
+
+/** Where a variable comes from, as the engine resolves it. */
+export type VariableSource =
+  | VariableTarget
+  | { kind: 'runtime' }
+
+/** A variable a request resolves, with the value it gets and where it comes from. */
+export interface VisibleVariable {
+  name: string
+  /** Null for a secret of the environment whose value was never typed. */
+  value: string | null
+  source: VariableSource
+  /** A secret of the environment: its value stays on this computer. */
+  secret: boolean
+}
+
 /** A workspace: a git repository (or a plain folder) holding collections. */
 export interface WorkspaceRepo {
   id: string

@@ -2,6 +2,7 @@
 // missing field, edge case…); the selected one is sent.
 import * as Menu from '@radix-ui/react-dropdown-menu'
 import { ChevronDown, Copy, FileJson, FolderOpen, Pencil, Plus, Trash2, Wand2 } from 'lucide-react'
+import { formatJsonTemplate } from '@core/jsonTemplate'
 import { BODY_TYPES, activeBody, newBody, type Body, type BodyType, type FormField, type HttpRequest } from '@core/model'
 import { api } from '../../lib/bridge'
 import { confirm, prompt, toast } from '../../components/feedback'
@@ -95,9 +96,9 @@ export function BodyPanel({ request, onChange }: { request: HttpRequest; onChang
 
   const format = (): void => {
     try {
-      setBody({ content: JSON.stringify(JSON.parse(body.content), null, 2) })
-    } catch {
-      toast('The body is not valid JSON (variables must be inside quotes to format it)', 'warning')
+      setBody({ content: formatJsonTemplate(body.content) })
+    } catch (error) {
+      toast(`The body is not valid JSON: ${(error as Error).message}`, 'warning')
     }
   }
 

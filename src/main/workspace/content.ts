@@ -8,11 +8,10 @@ import { importCurl } from '@core/import/curl'
 import { writeImported, type ImportResult } from '@core/import/imported'
 import { importOpenApi } from '@core/import/openapi'
 import { importPostman, importPostmanEnvironment } from '@core/import/postman'
-import { environmentValues } from '@core/environment'
 import { WorkspaceStore } from '@core/layout/store'
 import { enabledVars } from '@core/vars'
-import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '@core/model'
-import type { EnvironmentDraft } from '@shared/types'
+import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest, KeyValue } from '@core/model'
+import type { EnvironmentDraft, VariableSource, VariableTarget, VisibleVariable } from '@shared/types'
 import type { SecretStore, SecretValues } from '../secrets'
 import type { WorkspaceManager } from './manager'
 
@@ -190,19 +189,53 @@ export class ContentService {
   }
 
   /**
-   * Names a request of `folder` ('' for the root) can use with `env`: the
-   * collection, each enclosing folder and the environment, as the engine
-   * resolves them. A secret counts only once its value is typed.
+   * Variables a request of `folder` ('' for the root) resolves with `env`, as
+   * the engine does: each enclosing folder (inner first), then the
+   * environment, then the collection. Runtime variables are the caller's.
    */
-  visibleVariables(slug: string, folder: string, env: string | null): string[] {
+  visibleVariables(slug: string, folder: string, env: string | null): VisibleVariable[] {
     const store = this.store()
-    const names = new Set<string>(Object.keys(enabledVars(store.readCollection(slug).vars)))
+    const found = new Map<string, VisibleVariable>()
+    // Lowest priority first: a later scope replaces an earlier one.
+    const add = (vars: Record<string, string>, source: VariableSource): void => {
+      for (const [name, value] of Object.entries(vars)) found.set(name, { name, value, source, secret: false })
+    }
+    add(enabledVars(store.readCollection(slug).vars), { kind: 'collection' })
+    if (env) {
+      const environment = store.readEnvironment(slug, env)
+      const secrets = this.secretValues(slug, env)
+      add(enabledVars(environment.vars), { kind: 'environment', env })
+      for (const name of environment.secrets) {
+        const value = secrets[name] ? secrets[name] : null
+        found.set(name, { name, value, source: { kind: 'environment', env }, secret: true })
+      }
+    }
     const parts = folder ? folder.split('/') : []
     for (let i = 1; i <= parts.length; i++) {
-      Object.keys(enabledVars(store.readFolder(slug, parts.slice(0, i).join('/')).vars)).forEach((name) => names.add(name))
+      const path = parts.slice(0, i).join('/')
+      add(enabledVars(store.readFolder(slug, path).vars), { kind: 'folder', path })
     }
-    if (env) Object.keys(environmentValues(store, slug, env, this.secretValues(slug, env)).vars).forEach((name) => names.add(name))
-    return [...names].sort()
+    return [...found.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  /** Sets a variable of the collection, a folder or an environment, adding it when missing. */
+  async setVariable(slug: string, target: VariableTarget, name: string, value: string): Promise<void> {
+    const withValue = (rows: KeyValue[]): KeyValue[] => {
+      const index = rows.findIndex((row) => row.name === name)
+      if (index < 0) return [...rows, { name, value, enabled: true, description: '' }]
+      return rows.map((row, i) => (i === index ? { ...row, value, enabled: true } : row))
+    }
+    if (target.kind === 'collection') {
+      const collection = this.getCollection(slug)
+      await this.saveCollection(slug, { ...collection, vars: withValue(collection.vars) })
+    } else if (target.kind === 'folder') {
+      const folder = this.getFolder(slug, target.path)
+      await this.saveFolder(slug, target.path.split('/').slice(0, -1).join('/'), target.path, { ...folder, vars: withValue(folder.vars) })
+    } else {
+      const { environment, secretValues } = this.getEnvironment(slug, target.env)
+      if (environment.secrets.includes(name)) await this.saveEnvironment(slug, target.env, environment, { ...secretValues, [name]: value })
+      else await this.saveEnvironment(slug, target.env, { ...environment, vars: withValue(environment.vars) }, secretValues)
+    }
   }
 
   // --------------------------------------------------------- environments

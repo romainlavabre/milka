@@ -76,8 +76,14 @@ export function createHandlers({
         return [...new Set([...content.variableNames(collection), ...Object.keys(execution.runtimeVars())])].sort()
       },
       async visibleVariables({ collection, folder, env }) {
-        return [...new Set([...content.visibleVariables(collection, folder, env), ...Object.keys(execution.runtimeVars())])].sort()
-      }
+        // Runtime variables win over every other scope.
+        const runtime = execution.runtimeVars()
+        return [
+          ...content.visibleVariables(collection, folder, env).filter((v) => !(v.name in runtime)),
+          ...Object.entries(runtime).map(([name, value]) => ({ name, value, source: { kind: 'runtime' as const }, secret: false }))
+        ].sort((a, b) => a.name.localeCompare(b.name))
+      },
+      setVariable: ({ collection, target, name, value }) => content.setVariable(collection, target, name, value)
     },
     environments: {
       async list({ collection }) {
@@ -96,6 +102,9 @@ export function createHandlers({
       },
       async runtimeVars() {
         return { ...execution.runtimeVars() }
+      },
+      async setRuntimeVar({ name, value }) {
+        execution.runtimeVars()[name] = value
       },
       async clearRuntimeVars() {
         execution.clearRuntimeVars()

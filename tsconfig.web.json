@@ -30,6 +30,7 @@
     "src/core/script-typings.ts",
     "src/core/tree-search.ts",
     "src/core/varSyntax.ts",
+    "src/core/jsonTemplate.ts",
     "src/preload/*.d.ts"
   ]
 }

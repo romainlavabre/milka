@@ -99,7 +99,7 @@ describe('ContentService', () => {
     expect(alice.content.listCollections()[0].children).toMatchObject([{ kind: 'folder', children: [{ path: 'users/ping-copy.yaml' }] }])
   })
 
-  it('lists the variables a folder sees with an environment, secrets only once typed', async () => {
+  it('lists the variables a folder sees with an environment, their value and where they come from', async () => {
     const alice = content('alice')
     await alice.ws.create('Local')
     const row = (name: string, enabled = true) => ({ name, value: 'x', enabled, description: '' })
@@ -114,7 +114,36 @@ describe('ContentService', () => {
       { token: 't' }
     )
 
-    expect(alice.content.visibleVariables(slug, '', null)).toEqual(['baseUrl'])
-    expect(alice.content.visibleVariables(slug, admins, env)).toEqual(['adminId', 'baseUrl', 'hydraUrl', 'token', 'userId'])
+    expect(alice.content.visibleVariables(slug, '', null)).toEqual([
+      { name: 'baseUrl', value: 'x', source: { kind: 'collection' }, secret: false }
+    ])
+    const variables = alice.content.visibleVariables(slug, admins, env)
+    expect(variables.map((v) => v.name)).toEqual(['adminId', 'baseUrl', 'hydraUrl', 'token', 'untyped', 'userId'])
+    expect(variables).toContainEqual({ name: 'adminId', value: 'x', source: { kind: 'folder', path: admins }, secret: false })
+    expect(variables).toContainEqual({ name: 'token', value: 't', source: { kind: 'environment', env }, secret: true })
+    // A secret whose value was never typed here.
+    expect(variables).toContainEqual({ name: 'untyped', value: null, source: { kind: 'environment', env }, secret: true })
+  })
+
+  it('sets a variable of the collection, a folder or an environment', async () => {
+    const alice = content('alice')
+    await alice.ws.create('Local')
+    const slug = await alice.content.saveCollection(null, {
+      ...newCollection('API'),
+      vars: [{ name: 'baseUrl', value: 'old', enabled: false, description: 'kept' }]
+    })
+    const folder = await alice.content.saveFolder(slug, '', null, newFolder('Users'))
+    const env = await alice.content.saveEnvironment(slug, null, { ...newEnvironment('Dev'), secrets: ['token', 'other'] }, { other: 'o' })
+
+    await alice.content.setVariable(slug, { kind: 'collection' }, 'baseUrl', 'new')
+    await alice.content.setVariable(slug, { kind: 'folder', path: folder }, 'userId', '42')
+    await alice.content.setVariable(slug, { kind: 'environment', env }, 'token', 's3cret')
+    await alice.content.setVariable(slug, { kind: 'environment', env }, 'host', 'localhost')
+
+    expect(alice.content.getCollection(slug).vars).toEqual([{ name: 'baseUrl', value: 'new', enabled: true, description: 'kept' }])
+    expect(alice.content.getFolder(slug, folder).vars).toEqual([{ name: 'userId', value: '42', enabled: true, description: '' }])
+    const environment = alice.content.getEnvironment(slug, env)
+    expect(environment.secretValues).toEqual({ token: 's3cret', other: 'o' })
+    expect(environment.environment.vars).toEqual([{ name: 'host', value: 'localhost', enabled: true, description: '' }])
   })
 })

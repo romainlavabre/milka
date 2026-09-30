@@ -8,7 +8,7 @@ import { useDraft } from '../../lib/useDraft'
 import { PanelTabs } from '../../components/PanelTabs'
 import { Button, ErrorBox, Spinner } from '../../components/ui'
 import { retargetTabs, tabId } from '../../store'
-import { definedNames, VariableScopeProvider } from '../../components/variables'
+import { setVariableRow, VariableScopeProvider } from '../../components/variables'
 import { SettingsPanel, settingsTabs, type SettingsTab } from './SettingsPanels'
 import { parentOf, useRefreshContent } from './useCollections'
 
@@ -55,7 +55,15 @@ export function FolderView({ collection, path }: { collection: string; path: str
       </div>
       <PanelTabs tabs={settingsTabs(draft)} value={tab} onChange={setTab} />
       <div className="min-h-0 flex-1">
-        <VariableScopeProvider collection={collection} folder={path} extra={definedNames(draft.vars)}>
+        <VariableScopeProvider
+          collection={collection}
+          folder={path}
+          local={{
+            label: 'this folder',
+            rows: draft.vars,
+            set: (name, value) => setDraft((current) => ({ ...current, vars: setVariableRow(current.vars, name, value) }))
+          }}
+        >
           <SettingsPanel
             tab={tab}
             value={draft}

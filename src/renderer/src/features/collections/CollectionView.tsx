@@ -9,7 +9,7 @@ import { useDraft } from '../../lib/useDraft'
 import { ColorPalette } from '../../components/ColorPicker'
 import { PanelTabs } from '../../components/PanelTabs'
 import { Button, ErrorBox, Spinner } from '../../components/ui'
-import { definedNames, VariableScopeProvider } from '../../components/variables'
+import { setVariableRow, VariableScopeProvider } from '../../components/variables'
 import { retargetTabs, tabId } from '../../store'
 import { EnvironmentsPanel } from '../environments/EnvironmentsPanel'
 import { SettingsPanel, settingsTabs, type SettingsTab } from './SettingsPanels'
@@ -72,7 +72,15 @@ export function CollectionView({ collection }: { collection: string }) {
         {tab === 'environments' ? (
           <EnvironmentsPanel collection={collection} />
         ) : (
-          <VariableScopeProvider collection={collection} folder="" extra={definedNames(draft.vars)}>
+          <VariableScopeProvider
+            collection={collection}
+            folder=""
+            local={{
+              label: 'this collection',
+              rows: draft.vars,
+              set: (name, value) => setDraft((current) => ({ ...current, vars: setVariableRow(current.vars, name, value) }))
+            }}
+          >
             <SettingsPanel
               tab={tab}
               value={draft}

@@ -10,6 +10,7 @@ const name = z.string().trim().min(1).max(200)
 const collection = z.string().min(1).max(200)
 const nodePath = z.string().min(1).max(1000)
 const env = z.string().min(1).max(200)
+const variableName = z.string().regex(/^[^{}\s]+$/, 'Invalid variable name').max(200)
 
 export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } = {
   workspace: {
@@ -39,7 +40,17 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     removeRequest: z.object({ collection, path: nodePath }),
     move: z.object({ collection, from: nodePath, parent: z.string(), before: nodePath.nullable() }),
     variableNames: z.object({ collection }),
-    visibleVariables: z.object({ collection, folder: z.string().max(1000), env: env.nullable() })
+    visibleVariables: z.object({ collection, folder: z.string().max(1000), env: env.nullable() }),
+    setVariable: z.object({
+      collection,
+      target: z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('collection') }),
+        z.object({ kind: z.literal('folder'), path: nodePath }),
+        z.object({ kind: z.literal('environment'), env })
+      ]),
+      name: variableName,
+      value: z.string().max(100_000)
+    })
   },
   environments: {
     list: z.object({ collection }),
@@ -58,6 +69,7 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     }),
     cancel: z.object({ requestId: z.string() }),
     runtimeVars: none,
+    setRuntimeVar: z.object({ name: variableName, value: z.string().max(100_000) }),
     clearRuntimeVars: none,
     cookies: none,
     deleteCookie: z.object({ domain: z.string().max(300), path: z.string().max(2000), name: z.string().max(500) }),
