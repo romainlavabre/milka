@@ -51,12 +51,19 @@ describe('MCP server', () => {
       'create_environment',
       'create_folder',
       'create_request',
+      'delete_item',
+      'get_collection',
       'get_collection_tree',
+      'get_folder',
       'get_request',
       'list_collections',
       'list_environments',
       'list_workspaces',
+      'move_item',
       'run_request',
+      'update_collection',
+      'update_environment',
+      'update_folder',
       'update_request'
     ])
   })
@@ -128,5 +135,132 @@ describe('MCP server', () => {
     ])
     const error = await call('get_request', { collection: 'api', path: '../../milka.json' })
     expect(error).toMatchObject({ isError: true, text: 'Invalid path: ../../milka.json' })
+  })
+
+  it('changes the scripts, variables, settings and selected body of a request', async () => {
+    await json('create_collection', { name: 'API' })
+    const { path } = (await json('create_request', {
+      collection: 'api',
+      name: 'Login',
+      method: 'POST',
+      bodies: [
+        { name: 'Valid', content: '{}' },
+        { name: 'Wrong password', content: '{}' }
+      ],
+      scripts: { pre: 'req.setHeader("X-A", "1")' }
+    })) as { path: string }
+    await json('update_request', {
+      collection: 'api',
+      path,
+      activeBody: 'Wrong password',
+      scripts: { post: 'milka.vars.set("token", res.body.token)' },
+      variables: { post: [{ name: 'userId', value: 'res.body.id' }] },
+      settings: { timeout: 5000 }
+    })
+    const store = new WorkspaceStore(join(root, 'ws'))
+    expect(store.readRequest('api', path)).toMatchObject({
+      activeBody: 'Wrong password',
+      // The script left out is kept.
+      scripts: { pre: 'req.setHeader("X-A", "1")', post: 'milka.vars.set("token", res.body.token)' },
+      vars: { pre: [], post: [{ name: 'userId', value: 'res.body.id', enabled: true }] },
+      settings: { timeout: 5000, followRedirects: true, maxRedirects: 5 }
+    })
+    expect(await call('update_request', { collection: 'api', path, activeBody: 'Nope' })).toMatchObject({
+      isError: true,
+      text: 'No body named "Nope". Bodies: Valid, Wrong password'
+    })
+  })
+
+  it('reads and changes the settings of collections and folders', async () => {
+    await json('create_collection', { name: 'API' })
+    await json('create_folder', { collection: 'api', name: 'Admin' })
+    expect(
+      await json('update_collection', {
+        collection: 'api',
+        name: 'Public API',
+        color: '#ef4444',
+        headers: [{ name: 'X-Client', value: 'milka' }],
+        auth: { type: 'bearer', token: '{{token}}' },
+        variables: [{ name: 'baseUrl', value: 'https://api.acme.io' }]
+      })
+    ).toEqual({ collection: 'public-api' })
+    expect(await json('get_collection', { collection: 'public-api' })).toMatchObject({
+      name: 'Public API',
+      color: '#ef4444',
+      headers: [{ name: 'X-Client', value: 'milka' }],
+      auth: { type: 'bearer', token: '{{token}}' },
+      vars: [{ name: 'baseUrl', value: 'https://api.acme.io' }]
+    })
+    expect(
+      await json('update_folder', {
+        collection: 'public-api',
+        path: 'admin',
+        name: 'Back office',
+        auth: { type: 'basic', username: '{{user}}', password: '{{password}}' },
+        scripts: { pre: 'milka.vars.set("role", "admin")' },
+        docs: 'Admin endpoints.'
+      })
+    ).toEqual({ path: 'back-office' })
+    expect(await json('get_folder', { collection: 'public-api', path: 'back-office' })).toMatchObject({
+      name: 'Back office',
+      auth: { type: 'basic', username: '{{user}}' },
+      scripts: { pre: 'milka.vars.set("role", "admin")', post: '' },
+      docs: 'Admin endpoints.'
+    })
+  })
+
+  it('changes environment variables and declares secrets without their values', async () => {
+    await json('create_collection', { name: 'API' })
+    await json('create_environment', { collection: 'api', name: 'Staging', variables: [{ name: 'baseUrl', value: 'https://old' }] })
+    expect(
+      await json('update_environment', {
+        collection: 'api',
+        environment: 'Staging',
+        set: [
+          { name: 'baseUrl', value: 'https://staging.acme.io' },
+          { name: 'userId', value: '42' }
+        ],
+        secrets: ['token']
+      })
+    ).toEqual({
+      environment: 'staging',
+      variables: [
+        { name: 'baseUrl', value: 'https://staging.acme.io' },
+        { name: 'userId', value: '42' }
+      ],
+      secrets: ['token']
+    })
+    // A secret value is never written through the MCP server.
+    expect(
+      await call('update_environment', { collection: 'api', environment: 'staging', set: [{ name: 'token', value: 'abc' }] })
+    ).toMatchObject({
+      isError: true
+    })
+    // Renaming would lose the secret values saved on each machine: the app does it.
+    expect((await call('update_environment', { collection: 'api', environment: 'staging', name: 'Preprod' })).text).toContain(
+      'rename it in the Milka app'
+    )
+    expect((await call('update_collection', { collection: 'api', name: 'Other' })).text).toContain('rename it in the Milka app')
+    expect(await json('update_environment', { collection: 'api', environment: 'staging', remove: ['userId', 'token'] })).toMatchObject({
+      variables: [{ name: 'baseUrl' }],
+      secrets: []
+    })
+    expect(await json('update_environment', { collection: 'api', environment: 'staging', name: 'Preprod' })).toMatchObject({
+      environment: 'preprod'
+    })
+  })
+
+  it('moves and deletes requests and folders', async () => {
+    await json('create_collection', { name: 'API' })
+    await json('create_folder', { collection: 'api', name: 'Users' })
+    await json('create_request', { collection: 'api', name: 'Health' })
+    const { path } = (await json('create_request', { collection: 'api', name: 'List users' })) as { path: string }
+    expect(await json('move_item', { collection: 'api', path, parent: 'users' })).toEqual({ path: 'users/list-users.yaml' })
+    expect(await json('move_item', { collection: 'api', path: 'health.yaml', before: 'users' })).toEqual({ path: 'health.yaml' })
+    const store = new WorkspaceStore(join(root, 'ws'))
+    expect(store.readTree('api').map((n) => n.path)).toEqual(['health.yaml', 'users'])
+    expect(await json('delete_item', { collection: 'api', path: 'health.yaml' })).toEqual({ deleted: 'health.yaml' })
+    expect(await json('delete_item', { collection: 'api', path: 'users' })).toEqual({ deleted: 'users' })
+    expect(store.readTree('api')).toEqual([])
   })
 })

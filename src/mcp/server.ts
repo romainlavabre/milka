@@ -1,7 +1,7 @@
-// MCP server: lets an AI assistant browse collections, create collections,
-// folders and requests (with several bodies) and send requests. Files are
-// written in the workspace like the app does; the app shows them live and
-// commits them at the next Sync.
+// MCP server: lets an AI assistant browse, create, change, move and delete
+// collections, folders, requests (with several bodies) and environments, and
+// send requests. Files are written in the workspace like the app does; the
+// app shows them live and commits them at the next Sync.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { executeRequest } from '../core/engine'
@@ -12,15 +12,21 @@ import {
   BODY_TYPES,
   COLLECTION_COLORS,
   HTTP_METHODS,
+  collectionSchema,
+  folderSchema,
   newBody,
   newCollection,
   newEnvironment,
   newFolder,
   newRequest,
   requestSchema,
+  type Auth,
   type HttpRequest,
+  type KeyValue,
+  type Scripts,
   type TreeNode
 } from '../core/model'
+import { slugify } from '../core/slug'
 import { knownWorkspaces } from './workspaces'
 
 export interface McpOptions {
@@ -71,6 +77,72 @@ const bodyInput = z.object({
   content: z.string().default('').describe('Body text (JSON, XML, text, GraphQL query); file path for "binary"'),
   fields: keyValues.describe('Fields of "form" and "multipart" bodies')
 })
+const authInput = z
+  .object({
+    type: z.enum(AUTH_TYPES),
+    username: z.string().optional(),
+    password: z.string().optional(),
+    token: z.string().optional(),
+    key: z.string().optional(),
+    value: z.string().optional(),
+    in: z.enum(['header', 'query']).optional()
+  })
+  .optional()
+  .describe('Use {{variables}} for credentials; "inherit" takes the auth of the folder or collection')
+const scriptsInput = z
+  .object({
+    pre: z.string().optional().describe('TypeScript run before the request, e.g. req.setHeader(...)'),
+    post: z.string().optional().describe('TypeScript run after the response, e.g. milka.vars.set("id", res.body.id)')
+  })
+  .optional()
+  .describe('Scripts given replace the current ones; one left out is kept')
+
+type Rows = { name: string; value: string; enabled?: boolean }[]
+type AuthFields = Partial<Auth> & { type: Auth['type'] }
+
+const toKeyValues = (rows: Rows): KeyValue[] =>
+  rows.map((row) => ({ name: row.name, value: row.value, enabled: row.enabled ?? true, description: '' }))
+
+const parentOf = (path: string): string => (path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '')
+
+/** What folders and collections pass on to their requests. */
+const inheritedFields = {
+  headers: keyValues.describe('Headers added to every request inside'),
+  auth: authInput,
+  variables: keyValues.describe('Variables of the requests inside'),
+  scripts: scriptsInput,
+  tests: z.string().optional().describe('TypeScript tests run after every request inside'),
+  docs: z.string().optional()
+}
+
+type InheritedFields = {
+  headers?: Rows
+  auth?: AuthFields
+  variables?: Rows
+  scripts?: Partial<Scripts>
+  tests?: string
+  docs?: string
+}
+
+/** Applies the given fields on a folder or a collection; the others are kept. */
+function applyInherited<T extends { headers: KeyValue[]; auth: Auth; vars: KeyValue[]; scripts: Scripts; tests: string; docs: string }>(
+  base: T,
+  fields: InheritedFields
+): T {
+  return {
+    ...base,
+    ...(fields.headers && { headers: toKeyValues(fields.headers) }),
+    ...(fields.auth && { auth: { ...base.auth, ...fields.auth } }),
+    ...(fields.variables && { vars: toKeyValues(fields.variables) }),
+    ...(fields.scripts && { scripts: { ...base.scripts, ...fields.scripts } }),
+    ...(fields.tests !== undefined && { tests: fields.tests }),
+    ...(fields.docs !== undefined && { docs: fields.docs })
+  }
+}
+
+/** The local secret values follow a renamed collection or environment in the app only. */
+const RENAME_WITH_SECRETS =
+  'has secret variables: rename it in the Milka app, which moves the secret values saved on each machine along with it'
 
 export function createMcpServer(options: McpOptions): McpServer {
   const server = new McpServer(
@@ -78,7 +150,9 @@ export function createMcpServer(options: McpOptions): McpServer {
     {
       instructions:
         'Milka stores API requests as YAML files in git workspaces. A request can hold several named bodies (payload variants) and the selected one is sent. ' +
-        'Use {{variable}} placeholders for URLs, tokens and ids (e.g. {{baseUrl}}/users/:id). Changes are committed by the next Sync in the Milka app.'
+        'Use {{variable}} placeholders for URLs, tokens and ids (e.g. {{baseUrl}}/users/:id). Folders and collections pass their headers, auth, ' +
+        'variables and scripts on to the requests inside. Secret values are never readable nor writable here: declare the name, each user types ' +
+        'the value in Milka. Changes are committed by the next Sync in the Milka app, so a deletion can be undone from git.'
     }
   )
 
@@ -206,6 +280,137 @@ export function createMcpServer(options: McpOptions): McpServer {
     }))
   )
 
+  server.registerTool(
+    'get_collection',
+    {
+      title: 'Get collection',
+      description: 'Settings of a collection: color, and the headers, auth, variables, scripts and tests its requests inherit.',
+      inputSchema: { workspace: workspaceArg, collection: collectionArg }
+    },
+    tool(({ workspace, collection }: { workspace?: string; collection: string }) => workspaceOf(workspace).readCollection(collection))
+  )
+
+  server.registerTool(
+    'update_collection',
+    {
+      title: 'Update collection',
+      description:
+        'Changes settings of a collection; the fields given replace the current ones (headers replaces every header). Renaming renames its folder.',
+      inputSchema: {
+        workspace: workspaceArg,
+        collection: collectionArg,
+        name: z.string().optional(),
+        color: z
+          .string()
+          .optional()
+          .describe(`Hex color, one of ${COLLECTION_COLORS.join(', ')}`),
+        ...inheritedFields
+      }
+    },
+    tool(
+      ({
+        workspace,
+        collection,
+        name,
+        color,
+        ...fields
+      }: { workspace?: string; collection: string; name?: string; color?: string } & InheritedFields) => {
+        const store = workspaceOf(workspace)
+        const current = store.readCollection(collection)
+        if (name !== undefined && slugify(name) !== slugify(current.name) && slugify(name) !== collection) {
+          const withSecrets = store.listEnvironments(collection).some((e) => store.readEnvironment(collection, e.slug).secrets.length > 0)
+          if (withSecrets) throw new Error(`The collection "${current.name}" ${RENAME_WITH_SECRETS}`)
+        }
+        if (color !== undefined && !/^#[0-9a-fA-F]{6}$/.test(color)) throw new Error(`Invalid color "${color}": expected #rrggbb`)
+        const updated = collectionSchema.parse(
+          applyInherited({ ...current, name: name ?? current.name, color: color ?? current.color }, fields)
+        )
+        return { collection: store.writeCollection(collection, updated).id }
+      }
+    )
+  )
+
+  server.registerTool(
+    'get_folder',
+    {
+      title: 'Get folder',
+      description: 'Settings of a folder: the headers, auth, variables, scripts and tests its requests inherit.',
+      inputSchema: { workspace: workspaceArg, collection: collectionArg, path: z.string().describe('Folder path, e.g. users/admin') }
+    },
+    tool(({ workspace, collection, path }: { workspace?: string; collection: string; path: string }) =>
+      workspaceOf(workspace).readFolder(collection, path)
+    )
+  )
+
+  server.registerTool(
+    'update_folder',
+    {
+      title: 'Update folder',
+      description:
+        'Changes settings of a folder; the fields given replace the current ones (headers replaces every header). Renaming renames it.',
+      inputSchema: { workspace: workspaceArg, collection: collectionArg, path: z.string(), name: z.string().optional(), ...inheritedFields }
+    },
+    tool(
+      ({
+        workspace,
+        collection,
+        path,
+        name,
+        ...fields
+      }: { workspace?: string; collection: string; path: string; name?: string } & InheritedFields) => {
+        const store = workspaceOf(workspace)
+        const current = store.readFolder(collection, path)
+        const updated = folderSchema.parse(applyInherited({ ...current, name: name ?? current.name }, fields))
+        return { path: store.writeFolder(collection, parentOf(path), path, updated).id }
+      }
+    )
+  )
+
+  server.registerTool(
+    'move_item',
+    {
+      title: 'Move request or folder',
+      description: 'Moves a request or a folder into another folder of the same collection, or reorders it among its siblings.',
+      inputSchema: {
+        workspace: workspaceArg,
+        collection: collectionArg,
+        path: z.string().describe('Request file or folder to move'),
+        parent: z.string().default('').describe('Destination folder path, empty for the collection root'),
+        before: z.string().optional().describe('Path of the sibling to place it before; at the end when omitted')
+      }
+    },
+    tool(
+      ({
+        workspace,
+        collection,
+        path,
+        parent,
+        before
+      }: {
+        workspace?: string
+        collection: string
+        path: string
+        parent: string
+        before?: string
+      }) => ({ path: workspaceOf(workspace).move(collection, path, parent, before ?? null).id })
+    )
+  )
+
+  server.registerTool(
+    'delete_item',
+    {
+      title: 'Delete request or folder',
+      description: 'Deletes a request, or a folder with everything inside. It stays in the git history of the workspace.',
+      inputSchema: { workspace: workspaceArg, collection: collectionArg, path: z.string().describe('Request file or folder path') }
+    },
+    tool(({ workspace, collection, path }: { workspace?: string; collection: string; path: string }) => {
+      const store = workspaceOf(workspace)
+      if (path.endsWith('.yaml')) store.removeRequest(collection, path)
+      else store.removeFolder(collection, path)
+      return { deleted: path }
+    })
+  )
+
   const requestFields = {
     method: z.enum(HTTP_METHODS).optional(),
     url: z.string().optional().describe('e.g. {{baseUrl}}/users/:id — query parameters go in params'),
@@ -215,19 +420,24 @@ export function createMcpServer(options: McpOptions): McpServer {
       )
       .optional(),
     headers: keyValues,
-    auth: z
+    auth: authInput,
+    bodies: z.array(bodyInput).optional().describe('Payload variants; the first one is selected'),
+    activeBody: z.string().optional().describe('Name of the body to send'),
+    variables: z
       .object({
-        type: z.enum(AUTH_TYPES),
-        username: z.string().optional(),
-        password: z.string().optional(),
-        token: z.string().optional(),
-        key: z.string().optional(),
-        value: z.string().optional(),
-        in: z.enum(['header', 'query']).optional()
+        pre: keyValues.describe('Set before the request; values may use other {{variables}}'),
+        post: keyValues.describe('Set from the response: the value is an expression such as res.body.id')
       })
       .optional()
-      .describe('Use {{variables}} for credentials; "inherit" takes the auth of the folder or collection'),
-    bodies: z.array(bodyInput).optional().describe('Payload variants; the first one is selected'),
+      .describe('Request variables; a list given replaces the current one'),
+    scripts: scriptsInput,
+    settings: z
+      .object({
+        timeout: z.number().int().min(0).optional().describe('Milliseconds, 0 for the default'),
+        followRedirects: z.boolean().optional(),
+        maxRedirects: z.number().int().min(0).optional()
+      })
+      .optional(),
     assertions: z
       .array(
         z.object({ expr: z.string().describe('e.g. res.status, res.body.id'), op: z.string().default('eq'), value: z.unknown().optional() })
@@ -242,9 +452,13 @@ export function createMcpServer(options: McpOptions): McpServer {
     method?: string
     url?: string
     params?: { name: string; value: string; type: 'query' | 'path'; enabled?: boolean }[]
-    headers?: { name: string; value: string; enabled?: boolean }[]
-    auth?: Record<string, unknown>
-    bodies?: { name: string; type: string; content: string; fields?: { name: string; value: string; enabled?: boolean }[] }[]
+    headers?: Rows
+    auth?: AuthFields
+    bodies?: { name: string; type: string; content: string; fields?: Rows }[]
+    activeBody?: string
+    variables?: { pre?: Rows; post?: Rows }
+    scripts?: Partial<Scripts>
+    settings?: Partial<HttpRequest['settings']>
     assertions?: { expr: string; op: string; value?: unknown }[]
     tests?: string
     docs?: string
@@ -253,12 +467,25 @@ export function createMcpServer(options: McpOptions): McpServer {
 
   /** Applies the given fields on a request, validated by the model schema. */
   const apply = (base: HttpRequest, fields: RequestFields): HttpRequest => {
-    const patch: Record<string, unknown> = { ...fields }
+    const { variables, activeBody, ...rest } = fields
+    const patch: Record<string, unknown> = { ...rest }
     if (fields.bodies) {
       patch.bodies = fields.bodies.map((b) => ({ ...newBody(b.name, b.type as never, b.content), fields: b.fields ?? [] }))
       patch.activeBody = fields.bodies[0]?.name ?? null
     }
+    if (activeBody !== undefined) {
+      const names = ((patch.bodies as HttpRequest['bodies'] | undefined) ?? base.bodies).map((b) => b.name)
+      if (!names.includes(activeBody)) throw new Error(`No body named "${activeBody}". Bodies: ${names.join(', ') || 'none'}`)
+      patch.activeBody = activeBody
+    }
     if (fields.auth) patch.auth = { ...base.auth, ...fields.auth }
+    if (variables)
+      patch.vars = {
+        pre: variables.pre ? toKeyValues(variables.pre) : base.vars.pre,
+        post: variables.post ? toKeyValues(variables.post) : base.vars.post
+      }
+    if (fields.scripts) patch.scripts = { ...base.scripts, ...fields.scripts }
+    if (fields.settings) patch.settings = { ...base.settings, ...fields.settings }
     return requestSchema.parse({ ...base, ...patch })
   }
 
@@ -295,7 +522,8 @@ export function createMcpServer(options: McpOptions): McpServer {
     {
       title: 'Update request',
       description:
-        'Changes fields of a request; the fields given replace the current ones (bodies replaces every body). Renaming renames the file.',
+        'Changes fields of a request; the fields given replace the current ones (bodies replaces every body, a script left out is kept). ' +
+        'Renaming renames the file; move_item moves it to another folder.',
       inputSchema: { workspace: workspaceArg, collection: collectionArg, path: z.string(), name: z.string().optional(), ...requestFields }
     },
     tool(
@@ -309,8 +537,7 @@ export function createMcpServer(options: McpOptions): McpServer {
         const store = workspaceOf(workspace)
         const current = store.readRequest(collection, path)
         const updated = apply({ ...current, name: name ?? current.name }, fields)
-        const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
-        return { path: store.writeRequest(collection, parent, path, updated).id }
+        return { path: store.writeRequest(collection, parentOf(path), path, updated).id }
       }
     )
   )
@@ -355,8 +582,7 @@ export function createMcpServer(options: McpOptions): McpServer {
         // A lone body is not marked as selected in the file: keep sending the one that was sent.
         const current = request.activeBody ?? request.bodies[0]?.name ?? null
         const updated = { ...request, bodies: [...request.bodies, created], activeBody: select || !current ? created.name : current }
-        const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''
-        store.writeRequest(collection, parent, path, updated)
+        store.writeRequest(collection, parentOf(path), path, updated)
         return { bodies: updated.bodies.map((b) => b.name), selected: updated.activeBody }
       }
     )
@@ -411,6 +637,81 @@ export function createMcpServer(options: McpOptions): McpServer {
           secrets: secrets ?? []
         }
         return { environment: workspaceOf(workspace).writeEnvironment(collection, null, environment).id }
+      }
+    )
+  )
+
+  server.registerTool(
+    'update_environment',
+    {
+      title: 'Update environment',
+      description:
+        'Adds, changes or removes variables of an environment, or declares secret ones. The other variables are kept. ' +
+        'Secret values stay out of reach: each user types them in Milka.',
+      inputSchema: {
+        workspace: workspaceArg,
+        collection: collectionArg,
+        environment: z.string().describe('Environment name or slug'),
+        name: z.string().optional().describe('New name of the environment'),
+        set: keyValues.describe('Shared variables to add or change; their values are committed'),
+        secrets: z
+          .array(z.string())
+          .optional()
+          .describe('Names to declare secret; a shared variable of that name loses its committed value'),
+        remove: z.array(z.string()).optional().describe('Variables or secrets to remove')
+      }
+    },
+    tool(
+      ({
+        workspace,
+        collection,
+        environment,
+        name,
+        set,
+        secrets: declared,
+        remove
+      }: {
+        workspace?: string
+        collection: string
+        environment: string
+        name?: string
+        set?: Rows
+        secrets?: string[]
+        remove?: string[]
+      }) => {
+        const store = workspaceOf(workspace)
+        const slug = store.findEnvironment(collection, environment)
+        const current = store.readEnvironment(collection, slug)
+        let vars = [...current.vars]
+        let secrets = [...current.secrets]
+        for (const variable of remove ?? []) {
+          if (!vars.some((v) => v.name === variable) && !secrets.includes(variable))
+            throw new Error(`The environment "${current.name}" has no variable "${variable}"`)
+          vars = vars.filter((v) => v.name !== variable)
+          secrets = secrets.filter((s) => s !== variable)
+        }
+        for (const row of set ?? []) {
+          if (secrets.includes(row.name))
+            throw new Error(`"${row.name}" is a secret: its value is typed by each user in Milka, never written in the workspace`)
+          const index = vars.findIndex((v) => v.name === row.name)
+          const previous = index === -1 ? null : vars[index]
+          const next = {
+            name: row.name,
+            value: row.value,
+            enabled: row.enabled ?? previous?.enabled ?? true,
+            description: previous?.description ?? ''
+          }
+          if (index === -1) vars.push(next)
+          else vars[index] = next
+        }
+        for (const secret of declared ?? []) {
+          vars = vars.filter((v) => v.name !== secret)
+          if (!secrets.includes(secret)) secrets.push(secret)
+        }
+        if (name !== undefined && slugify(name) !== slugify(current.name) && slugify(name) !== slug && current.secrets.length > 0)
+          throw new Error(`The environment "${current.name}" ${RENAME_WITH_SECRETS}`)
+        const written = store.writeEnvironment(collection, slug, { ...current, name: name ?? current.name, vars, secrets })
+        return { environment: written.id, variables: vars.map((v) => ({ name: v.name, value: v.value })), secrets }
       }
     )
   )

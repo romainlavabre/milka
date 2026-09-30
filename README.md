@@ -170,9 +170,21 @@ Other commands: `milka import bruno|postman|openapi <source>`, `milka import cur
 
 ## MCP server
 
-`milka mcp` serves the workspaces of the app over stdio. The tools list collections and requests, create collections,
-folders, requests (with several bodies) and environments, and run requests with their tests. Secret values are never
-returned; changes appear in the app at once and are committed at the next Sync.
+`milka mcp` serves the workspaces of the app over stdio. Its tools:
+
+- read: `list_workspaces`, `list_collections`, `get_collection_tree`, `get_collection`, `get_folder`, `get_request`,
+  `list_environments`;
+- create: `create_collection`, `create_folder`, `create_request` (with several bodies), `add_body`,
+  `create_environment`;
+- change: `update_collection` and `update_folder` (name, color, headers, auth, variables, scripts, tests, docs),
+  `update_request` (every field, scripts and settings included), `update_environment` (set or remove variables,
+  declare secrets);
+- organize: `move_item`, `delete_item`;
+- run: `run_request`, with its assertions and tests.
+
+Secret values are never readable nor writable through MCP: the assistant declares the name, each user types the value.
+For the same reason, a collection or an environment with secrets is renamed from the app, which moves their local
+values. Changes appear in the app at once and are committed at the next Sync, so a deletion can be undone from git.
 
 ```bash
 claude mcp add milka -- milka mcp
