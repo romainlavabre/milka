@@ -57,6 +57,17 @@ interface MilkaSendOptions {
   body?: unknown
 }
 
+interface MilkaCookieOptions {
+  path?: string
+  /** Also sends the cookie to the subdomains of this domain. */
+  domain?: string
+  /** A date, or seconds from now. */
+  expires?: Date | string | number
+  secure?: boolean
+  httpOnly?: boolean
+  sameSite?: 'strict' | 'lax' | 'none'
+}
+
 interface Milka {
   /** Variables: runtime values set by scripts first, then request, folder, environment and collection variables. */
   vars: {
@@ -71,6 +82,21 @@ interface Milka {
   env: {
     readonly name: string | null
     get(name: MilkaVariableName): string | undefined
+  }
+  /**
+   * The cookie jar: cookies received are sent back to the requests they match, like a browser does.
+   * \`url\` is any URL of the site, {{variables}} allowed, e.g. milka.cookies.get('{{host}}', 'SESSION').
+   */
+  cookies: {
+    /** Value of the cookie a request to \`url\` would send. */
+    get(url: string, name: string): string | undefined
+    /** Name → value of the cookies a request to \`url\` would send. */
+    getAll(url: string): Record<string, string>
+    /** Stores a cookie for \`url\` (path "/" by default); \`expires\` is a date or seconds from now. */
+    set(url: string, name: string, value: string, options?: MilkaCookieOptions): void
+    delete(url: string, name: string): void
+    /** Deletes the cookies of \`url\`, or every cookie without it. */
+    clear(url?: string): void
   }
   /** Sends another request, e.g. to fetch a token. */
   sendRequest(options: MilkaSendOptions): Promise<MilkaResponse>

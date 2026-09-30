@@ -54,6 +54,13 @@ export function convertScript(code: string, tool: 'Bruno' | 'Postman'): string {
     .replace(/\bbru\.sendRequest\(/g, 'milka.sendRequest(')
     .replace(/\bbru\.runner\.skipRequest\(\)/g, 'milka.skip()')
     .replace(/\breq\.deleteHeader\(/g, 'req.removeHeader(')
+    // The cookie jar: bru.cookies.jar() is milka.cookies, whose methods take the same (url, name) arguments.
+    .replace(/\bbru\.cookies\.jar\(\)/g, 'milka.cookies')
+    .replace(/\.setCookie\(/g, '.set(')
+    .replace(/\.getCookies\(/g, '.getAll(')
+    .replace(/\.getCookie\(/g, '.get(')
+    .replace(/\.deleteCookies\(/g, '.clear(')
+    .replace(/\.deleteCookie\(/g, '.delete(')
     .replace(/\bres\.getBody\(\)/g, 'res.body')
     .replace(/\bres\.getStatus\(\)/g, 'res.status')
     .replace(/\bres\.getHeaders\(\)/g, 'res.headers')
@@ -64,6 +71,7 @@ export function convertScript(code: string, tool: 'Bruno' | 'Postman'): string {
     .replace(/\breq\.getBody\(\)/g, 'req.body')
     .replace(/\breq\.getHeader\(([^)]*)\)/g, 'req.headers[$1]')
     // Postman
+    .replace(/\bpm\.cookies\.get\(/g, 'milka.cookies.get(req.url, ')
     .replace(/\bpm\.(environment|collectionVariables|globals|variables)\.set\(/g, 'milka.vars.set(')
     .replace(/\bpm\.(collectionVariables|globals|variables)\.get\(/g, 'milka.vars.get(')
     .replace(/\bpm\.environment\.get\(/g, 'milka.env.get(')

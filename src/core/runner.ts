@@ -1,6 +1,7 @@
 // Runs the requests of a collection, folder or single request in order,
 // sharing runtime variables between them: what the Runner tab and
 // `milka run` do.
+import { Cookies } from './cookies'
 import { executeRequest, type EnvironmentValues } from './engine'
 import type { WorkspaceStore } from './layout/store'
 import { succeeded, type RunCase, type RunSummary } from './results'
@@ -14,6 +15,8 @@ export interface RunOptions {
   environment: EnvironmentValues
   processEnv?: Record<string, string | undefined>
   insecure?: boolean
+  /** Cookie jar of the run; a new one, shared by its requests, when omitted. */
+  cookies?: Cookies
   /** One case per body for requests with several bodies, instead of the selected body only. */
   allBodies?: boolean
   /** Stop at the first failure. */
@@ -54,6 +57,7 @@ export function planRun(options: Pick<RunOptions, 'store' | 'collection' | 'path
 export async function runCollection(options: RunOptions): Promise<RunSummary> {
   const started = Date.now()
   const runtime: VarMap = {}
+  const cookies = options.cookies ?? new Cookies()
   const planned = planRun(options)
   const cases: RunCase[] = []
   for (const [index, item] of planned.entries()) {
@@ -66,6 +70,7 @@ export async function runCollection(options: RunOptions): Promise<RunSummary> {
       bodyName: item.bodyName,
       environment: options.environment,
       runtime,
+      cookies,
       processEnv: options.processEnv,
       insecure: options.insecure,
       signal: options.signal

@@ -20,6 +20,7 @@ import { methodColor, parentOf, useRefreshContent } from '../collections/useColl
 import { EnvironmentSelect, useSelectedEnvironment } from '../environments/EnvironmentSelect'
 import { AssertPanel } from './AssertPanel'
 import { BodyPanel } from './BodyPanel'
+import { CookiesButton } from './CookiesButton'
 import { ResponsePanel } from './ResponsePanel'
 import { cancelRequest, sendRequest, useResponse } from './responses'
 
@@ -97,6 +98,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
           placeholder="{{baseUrl}}/users/:id"
           onChange={(e) => set(applyTypedUrl(e.target.value, draft.params))}
         />
+        <CookiesButton />
         <EnvironmentSelect collection={collection} />
         {response.running ? (
           <Button variant="secondary" icon={<Square className="size-3.5" />} onClick={() => cancelRequest(id)}>

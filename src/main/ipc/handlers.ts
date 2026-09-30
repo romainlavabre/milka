@@ -84,6 +84,15 @@ export function createHandlers({ workspace, content, execution, settings, update
       },
       async clearRuntimeVars() {
         execution.clearRuntimeVars()
+      },
+      async cookies() {
+        return execution.cookies().list()
+      },
+      async deleteCookie({ domain, path, name }) {
+        execution.cookies().remove(domain, path, name)
+      },
+      async clearCookies() {
+        execution.cookies().clear()
       }
     },
     importer: {

@@ -117,12 +117,18 @@ test('created', () => {
 
 - `req`: `method`, `url`, `headers`, `body` (parsed JSON for JSON bodies), `bodyName`, `setHeader()`, `removeHeader()`.
 - `res`: `status`, `headers`, `body` (parsed JSON), `text`, `time`, `size`, `header()`.
-- `milka`: `vars.get/set/has/delete`, `env.name/get`, `sendRequest()`, `skip()`, `uuid()`, `sleep()`, `base64`.
+- `milka`: `vars.get/set/has/delete`, `env.name/get`, `cookies`, `sendRequest()`, `skip()`, `uuid()`, `sleep()`, `base64`.
+- `milka.cookies`: `get(url, name)`, `getAll(url)`, `set(url, name, value, { path, domain, expires, secure, httpOnly })`,
+  `delete(url, name)`, `clear(url?)`; `url` is any URL of the site, `{{variables}}` allowed.
 - `test(name, fn)` and `expect(value)`: `toBe`, `toEqual`, `toBeDefined`, `toContain`, `toMatch`, `toHaveLength`,
   `toHaveProperty`, `toBeGreaterThan`… with `.not`.
 
 Scripts of the collection and of the folders run before those of the request. They run with your rights, like the
 scripts of a `package.json`: only open workspaces you trust.
+
+Cookies work as in a browser: the ones a response sets (redirects included) are sent back to the requests they match,
+by domain, path, expiry and `Secure`. The app keeps them per workspace until it quits, never on disk; the cookie button
+of the request bar lists them and deletes them. A run, `milka run` and each MCP session start with an empty jar.
 
 The **Assert** tab covers the common checks without code: `res.status equals 201`, `res.body.id exists`,
 `res.headers['content-type'] contains json`.

@@ -9,6 +9,7 @@
 import { readFileSync } from 'node:fs'
 import { basename, isAbsolute, resolve } from 'node:path'
 import { runAssertions } from './assert'
+import { Cookies, type CookieOptions } from './cookies'
 import { FormData, send, type PreparedRequest, type RawResponse } from './http'
 import type { WorkspaceStore } from './layout/store'
 import {
@@ -45,6 +46,8 @@ export interface ExecuteOptions {
   environment: EnvironmentValues
   /** Variables set by scripts, shared by the requests of a session or run. */
   runtime: VarMap
+  /** Cookie jar shared by the requests of a session or run; a new one for this request alone when omitted. */
+  cookies?: Cookies
   processEnv?: Record<string, string | undefined>
   insecure?: boolean
   signal?: AbortSignal
@@ -301,7 +304,17 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
     }
   }
 
+  const cookies = options.cookies ?? new Cookies()
+  // Scripts name the site of a cookie by any URL of it, {{variables}} allowed.
+  const cookieUrl = (url: string): string => normalizeUrl(vars.interpolate(url))
   const milka: MilkaApi = {
+    cookies: {
+      get: (url, name) => cookies.get(cookieUrl(url), name),
+      getAll: (url) => cookies.getAll(cookieUrl(url)),
+      set: (url, name, value, cookieOptions?: CookieOptions) => cookies.set(cookieUrl(url), name, stringify(value), cookieOptions),
+      delete: (url, name) => cookies.delete(cookieUrl(url), name),
+      clear: (url) => cookies.clear(url === undefined ? undefined : cookieUrl(url))
+    },
     vars: {
       get: (name) => vars.get(name),
       set: (name, value) => {
@@ -331,7 +344,7 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
           followRedirects: true,
           maxRedirects: 5
         },
-        { insecure: options.insecure, signal: options.signal }
+        { insecure: options.insecure, signal: options.signal, cookies }
       )
       return toScriptResponse(raw, raw.body.toString('utf8'))
     },
@@ -407,11 +420,13 @@ export async function executeRequest(options: ExecuteOptions): Promise<Execution
 
   let raw: RawResponse
   try {
-    raw = await send(prepared, { insecure: options.insecure, signal: options.signal })
+    raw = await send(prepared, { insecure: options.insecure, signal: options.signal, cookies })
   } catch (error) {
     result.error = (error as Error).message
     return done()
   }
+  // Shows the Cookie header the jar added.
+  if (result.request) result.request = { ...result.request, headers: raw.requestHeaders }
   const contentType = raw.headers.find(([name]) => name.toLowerCase() === 'content-type')?.[1] ?? ''
   const decoded = decodeBody(raw.body, contentType)
   result.response = {

@@ -3,7 +3,7 @@
 // Every method takes a single object argument (validated with zod in main) and
 // is exposed on channel `${domain}:${method}`.
 import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '../core/model'
-import type { ExecutionResult, RunCase, RunSummary } from '../core/results'
+import type { CookieInfo, ExecutionResult, RunCase, RunSummary } from '../core/results'
 import type { AppSettings, ConflictChoice, EnvironmentDraft, SyncStatus, UpdateStatus, WorkspaceRepo, WorkspaceState } from './types'
 
 export interface AppInfo {
@@ -66,6 +66,10 @@ export interface Api {
     /** Variables set by scripts during this session. */
     runtimeVars(): Promise<Record<string, string>>
     clearRuntimeVars(): Promise<void>
+    /** Cookies received during this session, in the active workspace. */
+    cookies(): Promise<CookieInfo[]>
+    deleteCookie(args: { domain: string; path: string; name: string }): Promise<void>
+    clearCookies(): Promise<void>
   }
   importer: {
     /** A Bruno collection folder (`path`), or a Postman / OpenAPI file (`path`) or text (`text`). */
@@ -149,7 +153,7 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
     'variableNames'
   ],
   environments: ['list', 'get', 'save', 'remove'],
-  http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars'],
+  http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars', 'cookies', 'deleteCookie', 'clearCookies'],
   importer: ['collection', 'environment', 'curl'],
   exporter: ['openapi'],
   runner: ['run', 'cancel'],

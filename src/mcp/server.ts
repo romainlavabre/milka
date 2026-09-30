@@ -4,6 +4,7 @@
 // app shows them live and commits them at the next Sync.
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
+import { Cookies } from '../core/cookies'
 import { executeRequest } from '../core/engine'
 import { environmentValues, secretsFromProcessEnv } from '../core/environment'
 import { WorkspaceStore } from '../core/layout/store'
@@ -145,6 +146,8 @@ const RENAME_WITH_SECRETS =
   'has secret variables: rename it in the Milka app, which moves the secret values saved on each machine along with it'
 
 export function createMcpServer(options: McpOptions): McpServer {
+  // Cookies received by run_request are sent by the next ones, as in the app, until the session ends.
+  const cookies = new Cookies()
   const server = new McpServer(
     { name: 'milka', version: options.version },
     {
@@ -757,6 +760,7 @@ export function createMcpServer(options: McpOptions): McpServer {
           bodyName: body ?? null,
           environment: environmentValues(store, collection, env, secrets),
           runtime: {},
+          cookies,
           processEnv: options.env
         })
         const response = result.response

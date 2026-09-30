@@ -3,6 +3,7 @@
 import { STATUS_CODES } from 'node:http'
 import { Agent, FormData, request as undiciRequest, type Dispatcher } from 'undici'
 
+import type { Cookies } from './cookies'
 import type { Header, Redirect } from './results'
 
 export interface PreparedRequest {
@@ -23,6 +24,8 @@ export interface RawResponse {
   /** Final URL after redirects. */
   url: string
   redirects: Redirect[]
+  /** Headers of the first request as sent, with the cookies of the jar. */
+  requestHeaders: Header[]
   /** Milliseconds until the response headers, and until the end of the body. */
   timings: { ttfb: number; total: number }
 }
@@ -31,6 +34,30 @@ export interface SendOptions {
   /** Accept invalid TLS certificates (self-signed dev servers). */
   insecure?: boolean
   signal?: AbortSignal
+  /** Sends the matching cookies and keeps the ones received, at every hop. */
+  cookies?: Cookies
+}
+
+/**
+ * Adds the cookies of the jar matching `url` to the Cookie header; a cookie
+ * written in the request wins over a stored one of the same name.
+ */
+export function withCookies(headers: Header[], url: string, cookies: Cookies | undefined): Header[] {
+  const stored = cookies?.header(url) ?? ''
+  if (!stored) return headers
+  const index = headers.findIndex(([name]) => name.toLowerCase() === 'cookie')
+  if (index === -1) return [...headers, ['Cookie', stored]]
+  const explicit = headers[index][1]
+  const written = new Set(explicit.split(';').map((pair) => pair.split('=')[0].trim()))
+  const added = stored.split('; ').filter((pair) => !written.has(pair.split('=')[0].trim()))
+  if (added.length === 0) return headers
+  const merged = [explicit.trim().replace(/;$/, ''), ...added].filter(Boolean).join('; ')
+  return headers.map((header, i): Header => (i === index ? [header[0], merged] : header))
+}
+
+function setCookieHeaders(raw: Record<string, string | string[] | undefined>): string[] {
+  const value = raw['set-cookie']
+  return value === undefined ? [] : Array.isArray(value) ? value : [value]
 }
 
 const agents = new Map<boolean, Dispatcher>()
@@ -60,13 +87,17 @@ export async function send(prepared: PreparedRequest, options: SendOptions = {})
   let headers = prepared.headers
   const timeout = AbortSignal.timeout(prepared.timeoutMs)
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout
+  let requestHeaders: Header[] | null = null
 
   for (;;) {
     let response: Dispatcher.ResponseData
+    // The jar is read at every hop: a redirect may lead to another host or path.
+    const sent = withCookies(headers, url, options.cookies)
+    requestHeaders ??= sent
     try {
       response = await undiciRequest(url, {
         method: method as Dispatcher.HttpMethod,
-        headers: headers.flat(),
+        headers: sent.flat(),
         body,
         signal,
         dispatcher: agent(!!options.insecure)
@@ -77,6 +108,8 @@ export async function send(prepared: PreparedRequest, options: SendOptions = {})
       throw describeNetworkError(error, url)
     }
     const ttfb = performance.now() - started
+    // Cookies set by a redirect response count for the next hop, as in browsers.
+    options.cookies?.receive(url, setCookieHeaders(response.headers))
     const location = response.headers.location
     if (prepared.followRedirects && location && response.statusCode >= 300 && response.statusCode < 400) {
       await response.body.dump()
@@ -102,6 +135,7 @@ export async function send(prepared: PreparedRequest, options: SendOptions = {})
       body: buffer,
       url,
       redirects,
+      requestHeaders: requestHeaders ?? headers,
       timings: { ttfb, total: performance.now() - started }
     }
   }

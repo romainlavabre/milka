@@ -8,6 +8,7 @@
 import { randomUUID } from 'node:crypto'
 import vm from 'node:vm'
 import { transform } from 'sucrase'
+import type { CookieOptions } from './cookies'
 import { expect } from './expect'
 import type { LogEntry, TestResult } from './results'
 
@@ -56,6 +57,13 @@ export interface MilkaApi {
     delete(name: string): void
   }
   env: { name: string | null; get(name: string): string | undefined }
+  cookies: {
+    get(url: string, name: string): string | undefined
+    getAll(url: string): Record<string, string>
+    set(url: string, name: string, value: string, options?: CookieOptions): void
+    delete(url: string, name: string): void
+    clear(url?: string): void
+  }
   sendRequest(options: { method?: string; url: string; headers?: Record<string, string>; body?: unknown }): Promise<ScriptResponse>
   skip(reason?: string): void
   uuid(): string

@@ -57,7 +57,10 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     }),
     cancel: z.object({ requestId: z.string() }),
     runtimeVars: none,
-    clearRuntimeVars: none
+    clearRuntimeVars: none,
+    cookies: none,
+    deleteCookie: z.object({ domain: z.string().max(300), path: z.string().max(2000), name: z.string().max(500) }),
+    clearCookies: none
   },
   importer: {
     collection: z

@@ -85,6 +85,20 @@ export function caseLabel(runCase: Pick<RunCase, 'name' | 'bodyName'>): string {
   return runCase.bodyName ? `${runCase.name} [${runCase.bodyName}]` : runCase.name
 }
 
+/** A cookie of the jar, as shown in the app. */
+export interface CookieInfo {
+  name: string
+  value: string
+  domain: string
+  path: string
+  /** ISO date, null for a session cookie. */
+  expires: string | null
+  secure: boolean
+  httpOnly: boolean
+  /** Sent to the domain only, not to its subdomains (no Domain attribute). */
+  hostOnly: boolean
+}
+
 /** True when the request was sent (or skipped on purpose) and every assertion and test passed. */
 export function succeeded(result: ExecutionResult): boolean {
   return !result.error && (result.skipped !== null || (result.response !== null && result.tests.every((t) => t.passed)))

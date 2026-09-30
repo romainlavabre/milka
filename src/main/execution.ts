@@ -1,5 +1,7 @@
 // Sends requests of the active workspace from the app: environment with its
-// local secrets, runtime variables kept for the session, cancellation.
+// local secrets, runtime variables and cookies kept for the session,
+// cancellation. A run gets its own variables and cookies.
+import { Cookies } from '@core/cookies'
 import { executeRequest, type ExecutionResult } from '@core/engine'
 import { environmentValues } from '@core/environment'
 import type { HttpRequest } from '@core/model'
@@ -13,6 +15,8 @@ import type { SettingsStore } from './settings'
 export class ExecutionService {
   /** Variables set by scripts, per workspace, until the app quits. */
   private readonly runtime = new Map<string, VarMap>()
+  /** Cookies received, per workspace, until the app quits: never written to disk. */
+  private readonly jars = new Map<string, Cookies>()
   private readonly running = new Map<string, AbortController>()
 
   constructor(
@@ -33,6 +37,17 @@ export class ExecutionService {
 
   clearRuntimeVars(): void {
     this.runtime.delete(this.workspace.active().id)
+  }
+
+  /** The cookie jar of the active workspace. */
+  cookies(): Cookies {
+    const repoId = this.workspace.active().id
+    let jar = this.jars.get(repoId)
+    if (!jar) {
+      jar = new Cookies()
+      this.jars.set(repoId, jar)
+    }
+    return jar
   }
 
   async send(args: {
@@ -56,6 +71,7 @@ export class ExecutionService {
         bodyName: args.bodyName,
         environment: environmentValues(store, args.collection, args.env, secrets),
         runtime: this.runtimeVars(),
+        cookies: this.cookies(),
         processEnv: process.env,
         insecure: this.settings.read().insecureTls,
         signal: controller.signal

@@ -20,6 +20,8 @@ function readBody(req: IncomingMessage): Promise<string> {
  * - `/echo…` returns the received method, path, headers and body as JSON
  * - `/status/<code>` answers with that status
  * - `/redirect` sends to `/echo?redirected=1`
+ * - `/login` sets the cookie SESSION=abc
+ * - `/login-redirect` sets the cookie HOP=1 and sends to `/echo`
  * - `/users` POST creates a user from a JSON body with a name (400 without)
  * - `/slow` answers after 2 seconds
  */
@@ -36,6 +38,14 @@ export async function startEchoServer(): Promise<EchoServer> {
     if (url.pathname.startsWith('/status/')) return json(Number(url.pathname.split('/')[2]), { ok: false })
     if (url.pathname === '/redirect') {
       res.writeHead(302, { Location: '/echo?redirected=1' })
+      return res.end()
+    }
+    if (url.pathname === '/login') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'SESSION=abc; Path=/; HttpOnly' })
+      return res.end(JSON.stringify({ ok: true }))
+    }
+    if (url.pathname === '/login-redirect') {
+      res.writeHead(302, { Location: '/echo', 'Set-Cookie': 'HOP=1; Path=/' })
       return res.end()
     }
     if (url.pathname === '/users' && req.method === 'POST') {
