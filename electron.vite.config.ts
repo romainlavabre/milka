@@ -18,6 +18,14 @@ export default defineConfig({
     // Monaco ships one chunk per language: listing them all drowns real warnings.
     logLevel: 'warn',
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        // zod places tree-shaking hints where Rollup cannot read them: harmless.
+        onwarn(warning, warn) {
+          if (warning.code !== 'INVALID_ANNOTATION') warn(warning)
+        }
+      }
+    },
     resolve: {
       alias: { ...shared, '@': resolve('src/renderer/src') }
     }

@@ -65,7 +65,8 @@ function TabButton({ tab, active }: { tab: Tab; active: boolean }) {
   const { data: collections } = useCollections()
   const collection = collections?.find((c) => c.slug === tab.collection)
   const node = tab.path ? findNode(collection?.children ?? [], tab.path) : undefined
-  const dirty = useApp((s) => s.dirty[tab.id] ?? false)
+  // A tab is dirty when its editor, or one of its sub-editors (`<id>#…`), has unsaved changes.
+  const dirty = useApp((s) => Object.entries(s.dirty).some(([key, value]) => value && (key === tab.id || key.startsWith(`${tab.id}#`))))
 
   let icon = <FileText className="size-3.5 text-muted" />
   let title = node?.name ?? tab.path
