@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { newEnvironment, type Environment } from '@core/model'
 import type { EnvironmentDraft } from '@shared/types'
 import { api, errorMessage } from '../../lib/bridge'
+import { useShortcut } from '../../lib/shortcuts'
 import { confirm, prompt, toast } from '../../components/feedback'
 import { Button, EmptyState, IconButton, Input, Spinner } from '../../components/ui'
 import { selectEnvironment, setDirty, tabId } from '../../store'
@@ -154,16 +155,8 @@ function EnvironmentEditor({ collection, env, onDuplicate, onRenamed }: { collec
     }
   }
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        void save()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  })
+  // Saves the environment rather than the collection while it has changes.
+  useShortcut('s', () => void save(), dirty)
 
   const remove = async (): Promise<void> => {
     const ok = await confirm({ title: `Delete environment "${name}"`, body: 'Its variables and the local secret values are deleted.', confirmLabel: 'Delete', danger: true })

@@ -37,7 +37,8 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     saveRequest: z.object({ collection, parent: z.string(), path: nodePath.nullable(), data: requestSchema }),
     duplicateRequest: z.object({ collection, path: nodePath }),
     removeRequest: z.object({ collection, path: nodePath }),
-    move: z.object({ collection, from: nodePath, parent: z.string(), before: nodePath.nullable() })
+    move: z.object({ collection, from: nodePath, parent: z.string(), before: nodePath.nullable() }),
+    variableNames: z.object({ collection })
   },
   environments: {
     list: z.object({ collection }),

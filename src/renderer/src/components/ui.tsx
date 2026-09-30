@@ -248,7 +248,7 @@ export function SegmentedControl<T extends string>({
         <button
           key={option.value}
           className={clsx(
-            'rounded px-2.5 py-1 text-xs transition',
+            'whitespace-nowrap rounded px-2.5 py-1 text-xs transition',
             value === option.value ? 'bg-panel-2 text-fg shadow' : 'text-muted hover:text-fg'
           )}
           onClick={() => onChange(option.value)}

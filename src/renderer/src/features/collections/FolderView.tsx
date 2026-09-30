@@ -46,7 +46,7 @@ export function FolderView({ collection, path }: { collection: string; path: str
       </div>
       <PanelTabs tabs={settingsTabs(draft)} value={tab} onChange={setTab} />
       <div className="min-h-0 flex-1">
-        <SettingsPanel tab={tab} value={draft} onChange={setDraft} scope={`folder/${collection}/${path}`} allowInherit />
+        <SettingsPanel tab={tab} value={draft} onChange={setDraft} scope={`folder/${collection}/${path}`} collection={collection} allowInherit />
       </div>
     </div>
   )

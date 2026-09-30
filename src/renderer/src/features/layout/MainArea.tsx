@@ -1,7 +1,7 @@
 // Tab bar and content of the open tabs.
 import clsx from 'clsx'
 import { FileText, Folder as FolderIcon, Layers, Play, X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useShortcut } from '../../lib/shortcuts'
 import { EmptyState } from '../../components/ui'
 import { closeTab, useApp, type Tab } from '../../store'
 import { findNode, methodColor, useCollections } from '../collections/useCollections'
@@ -15,16 +15,7 @@ export function MainArea() {
   const activeTabId = useApp((s) => s.activeTabId)
   const active = tabs.find((t) => t.id === activeTabId) ?? null
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'w' && activeTabId) {
-        e.preventDefault()
-        closeTab(activeTabId)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [activeTabId])
+  useShortcut('w', () => activeTabId && closeTab(activeTabId))
 
   return (
     <div className="flex h-full min-w-0 flex-col">

@@ -36,12 +36,14 @@ export function SettingsPanel<T extends Inheritable>({
   value,
   onChange,
   scope,
+  collection,
   allowInherit
 }: {
   tab: SettingsTab
   value: T
   onChange: (value: T) => void
   scope: string
+  collection: string
   allowInherit: boolean
 }): ReactNode {
   const set = (patch: Partial<Inheritable>): void => onChange({ ...value, ...patch })
@@ -67,13 +69,13 @@ export function SettingsPanel<T extends Inheritable>({
     case 'scripts':
       return (
         <div className="h-full p-3">
-          <ScriptsEditor scripts={value.scripts} onChange={(scripts) => set({ scripts })} scope={scope} />
+          <ScriptsEditor scripts={value.scripts} onChange={(scripts) => set({ scripts })} scope={scope} collection={collection} />
         </div>
       )
     case 'tests':
       return (
         <div className="h-full p-3">
-          <TestsEditor value={value.tests} onChange={(tests) => set({ tests })} scope={scope} />
+          <TestsEditor value={value.tests} onChange={(tests) => set({ tests })} scope={scope} collection={collection} />
         </div>
       )
     case 'docs':

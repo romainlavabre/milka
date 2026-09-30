@@ -117,6 +117,33 @@ export class ContentService {
     })
   }
 
+  /** Every variable name defined in a collection, its folders, requests and environments. */
+  variableNames(slug: string): string[] {
+    const store = this.store()
+    const names = new Set<string>()
+    const add = (rows: { name: string }[]): void => rows.forEach((row) => row.name && names.add(row.name))
+    add(store.readCollection(slug).vars)
+    for (const env of store.listEnvironments(slug)) {
+      const environment = store.readEnvironment(slug, env.slug)
+      add(environment.vars)
+      environment.secrets.forEach((name) => names.add(name))
+    }
+    const walk = (nodes: ReturnType<WorkspaceStore['readTree']>): void => {
+      for (const node of nodes) {
+        if (node.kind === 'folder') {
+          add(store.readFolder(slug, node.path).vars)
+          walk(node.children)
+        } else {
+          const request = store.readRequest(slug, node.path)
+          add(request.vars.pre)
+          add(request.vars.post)
+        }
+      }
+    }
+    walk(store.readTree(slug))
+    return [...names].sort()
+  }
+
   // --------------------------------------------------------- environments
 
   listEnvironments(slug: string): EnvironmentSummary[] {

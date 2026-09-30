@@ -59,7 +59,7 @@ export function CollectionView({ collection }: { collection: string }) {
         {tab === 'environments' ? (
           <EnvironmentsPanel collection={collection} />
         ) : (
-          <SettingsPanel tab={tab} value={draft} onChange={setDraft} scope={`collection/${collection}`} allowInherit={false} />
+          <SettingsPanel tab={tab} value={draft} onChange={setDraft} scope={`collection/${collection}`} collection={collection} allowInherit={false} />
         )}
       </div>
     </div>

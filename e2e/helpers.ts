@@ -26,6 +26,15 @@ export async function launch(): Promise<Launched> {
   }
 }
 
+/**
+ * Types code in the focused Monaco editor through the clipboard: typed keys
+ * would accept autocompletion suggestions on commit characters, as in VS Code.
+ */
+export async function pasteCode(app: ElectronApplication, page: Page, code: string): Promise<void> {
+  await app.evaluate(({ clipboard }, text) => clipboard.writeText(text), code)
+  await page.keyboard.press('Control+V')
+}
+
 export async function createWorkspace(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'Add workspace' }).click()
   await page.getByPlaceholder('Client A').fill(name)

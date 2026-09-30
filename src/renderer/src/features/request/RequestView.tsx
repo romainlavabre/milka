@@ -1,7 +1,8 @@
 // Request editor: method and URL bar, request tabs on the left, response on the right.
 import { useQueryClient } from '@tanstack/react-query'
 import { Save, Send, Square } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useShortcut } from '../../lib/shortcuts'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 import { HTTP_METHODS, type HttpRequest, type KeyValue, type Param } from '@core/model'
 import { applyTypedUrl, displayUrl, syncPathParams } from '@core/url'
@@ -48,16 +49,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
     if (draft) void sendRequest({ tabId: id, collection, path, request: draft, env })
   }, [draft, id, collection, path, env])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault()
-        send()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [send])
+  useShortcut('Enter', send)
 
   if (error) return <ErrorBox>{String(error)}</ErrorBox>
   if (!draft) return <Spinner className="m-4" />
@@ -119,7 +111,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
           <div className="flex h-full min-h-0 flex-col">
             <PanelTabs tabs={tabs} value={tab} onChange={setTab} />
             <div className="min-h-0 flex-1">
-              <RequestTabContent tab={tab} request={draft} onChange={setDraft} scope={`request/${collection}/${path}`} />
+              <RequestTabContent tab={tab} request={draft} onChange={setDraft} collection={collection} scope={`request/${collection}/${path}`} />
             </div>
           </div>
         </Panel>
@@ -132,7 +124,19 @@ export function RequestView({ collection, path }: { collection: string; path: st
   )
 }
 
-function RequestTabContent({ tab, request, onChange, scope }: { tab: RequestTab; request: HttpRequest; onChange: (r: HttpRequest) => void; scope: string }) {
+function RequestTabContent({
+  tab,
+  request,
+  onChange,
+  collection,
+  scope
+}: {
+  tab: RequestTab
+  request: HttpRequest
+  onChange: (r: HttpRequest) => void
+  collection: string
+  scope: string
+}) {
   const set = (patch: Partial<HttpRequest>): void => onChange({ ...request, ...patch })
   switch (tab) {
     case 'params': {
@@ -193,7 +197,7 @@ function RequestTabContent({ tab, request, onChange, scope }: { tab: RequestTab;
     case 'scripts':
       return (
         <div className="h-full p-3">
-          <ScriptsEditor scripts={request.scripts} onChange={(scripts) => set({ scripts })} scope={scope} />
+          <ScriptsEditor scripts={request.scripts} onChange={(scripts) => set({ scripts })} scope={scope} collection={collection} />
         </div>
       )
     case 'assert':
@@ -201,7 +205,7 @@ function RequestTabContent({ tab, request, onChange, scope }: { tab: RequestTab;
     case 'tests':
       return (
         <div className="h-full p-3">
-          <TestsEditor value={request.tests} onChange={(tests) => set({ tests })} scope={scope} />
+          <TestsEditor value={request.tests} onChange={(tests) => set({ tests })} scope={scope} collection={collection} />
         </div>
       )
     case 'docs':

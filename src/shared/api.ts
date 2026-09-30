@@ -43,6 +43,8 @@ export interface Api {
     removeRequest(args: { collection: string; path: string }): Promise<void>
     /** Moves a node into `parent`, before the sibling `before` (at the end when null). */
     move(args: { collection: string; from: string; parent: string; before: string | null }): Promise<string>
+    /** Variable names known in a collection (for script autocompletion). */
+    variableNames(args: { collection: string }): Promise<string[]>
   }
   environments: {
     list(args: { collection: string }): Promise<EnvironmentSummary[]>
@@ -101,7 +103,8 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
     'saveRequest',
     'duplicateRequest',
     'removeRequest',
-    'move'
+    'move',
+    'variableNames'
   ],
   environments: ['list', 'get', 'save', 'remove'],
   http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars'],

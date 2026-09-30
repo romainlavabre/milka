@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from '../components/feedback'
 import { setDirty } from '../store'
 import { errorMessage } from './bridge'
+import { useShortcut } from './shortcuts'
 
 export interface Draft<T> {
   draft: T | null
@@ -60,16 +61,7 @@ export function useDraft<T>(options: { queryKey: unknown[]; load: () => Promise<
     }
   }, [options.tabId])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault()
-        void save()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [save])
+  useShortcut('s', () => void save(), dirty)
 
   return { draft, setDraft, dirty, saving, save, error: query.error }
 }

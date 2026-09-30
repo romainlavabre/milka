@@ -56,7 +56,10 @@ export function createHandlers({ workspace, content, execution, settings, window
       saveRequest: ({ collection, parent, path, data }) => content.saveRequest(collection, parent, path, data),
       duplicateRequest: ({ collection, path }) => content.duplicateRequest(collection, path),
       removeRequest: ({ collection, path }) => content.removeRequest(collection, path),
-      move: ({ collection, from, parent, before }) => content.move(collection, from, parent, before)
+      move: ({ collection, from, parent, before }) => content.move(collection, from, parent, before),
+      async variableNames({ collection }) {
+        return [...new Set([...content.variableNames(collection), ...Object.keys(execution.runtimeVars())])].sort()
+      }
     },
     environments: {
       async list({ collection }) {
