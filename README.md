@@ -186,6 +186,7 @@ For Claude Desktop, in `claude_desktop_config.json`:
 ```bash
 npm install
 npm run dev          # the app with hot reload
+./run.sh --sandbox   # the same, with a throwaway data folder in .sandbox/
 npm run typecheck
 npm run lint
 npm test             # unit tests (engine, storage, git sync, CLI, MCP, imports)
