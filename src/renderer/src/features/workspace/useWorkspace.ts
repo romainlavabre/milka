@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { create } from 'zustand'
 import type { SyncStatus, WorkspaceState } from '@shared/types'
 import { api, onEvent } from '../../lib/bridge'
-import { closeAllTabs } from '../../store'
+import { closeAllTabs, useApp } from '../../store'
 
 export function useWorkspace() {
   return useQuery({ queryKey: ['workspace'], queryFn: () => api.workspace.state(), staleTime: Infinity })
@@ -29,6 +29,11 @@ export function useWorkspaceStatus(): void {
   const queryClient = useQueryClient()
   const { data } = useWorkspace()
   const activeRepoId = data?.activeRepoId
+
+  // Pins and other per-workspace preferences follow the active workspace.
+  useEffect(() => {
+    useApp.setState({ repoId: activeRepoId ?? null })
+  }, [activeRepoId])
 
   useEffect(
     () =>

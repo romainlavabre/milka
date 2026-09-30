@@ -11,6 +11,8 @@ import {
   FolderPlus,
   Palette,
   Pencil,
+  Pin,
+  PinOff,
   Play,
   Plus,
   Search,
@@ -26,11 +28,11 @@ import { countRequests, highlightRanges, searchTree, searchWords } from '@core/t
 import { api, errorMessage } from '../../lib/bridge'
 import { confirm, prompt, toast } from '../../components/feedback'
 import { EmptyState, IconButton } from '../../components/ui'
-import { closeTabsUnder, openTab, retargetTabs, tabId, useApp } from '../../store'
+import { closeTabsUnder, openTab, retargetTabs, tabId, togglePin, useApp, useIsPinned, usePins } from '../../store'
 import { askUnsaved, draftsUnder } from '../layout/UnsavedChanges'
 import { menuContentClass, menuItemClass } from '../workspace/WorkspaceSwitcher'
 import { ImportDialog } from './ImportDialog'
-import { methodColor, parentOf, useCollections, useRefreshContent } from './useCollections'
+import { findNode, methodColor, parentOf, useCollections, useRefreshContent } from './useCollections'
 
 const DRAG_TYPE = 'application/x-milka-node'
 
@@ -95,6 +97,7 @@ export function CollectionTree() {
         <ImportDialog open={importing} onOpenChange={setImporting} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto px-1 pb-4">
+        {collections && <PinnedRequests collections={collections} />}
         {collections?.map((collection) => (
           <CollectionRow key={collection.slug} collection={collection} />
         ))}
@@ -106,6 +109,65 @@ export function CollectionTree() {
           </EmptyState>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Method of a request, right-aligned in a fixed width so that names line up. */
+function MethodLabel({ method }: { method: string }) {
+  return (
+    <span className="w-10 shrink-0 text-right font-mono text-[10px] font-bold" style={{ color: methodColor(method) }}>
+      {method.length > 6 ? method.slice(0, 5) : method}
+    </span>
+  )
+}
+
+/** The pinned requests of the workspace, above the collections, in the order they were pinned. */
+function PinnedRequests({ collections }: { collections: CollectionSummary[] }) {
+  const pins = usePins()
+  const activeTabId = useApp((s) => s.activeTabId)
+  // A pin whose request is gone (deleted from git, another machine) is not shown.
+  const items = pins.flatMap((pin) => {
+    const collection = collections.find((c) => c.slug === pin.collection)
+    const node = collection && findNode(collection.children, pin.path)
+    if (!collection || node?.kind !== 'request') return []
+    // Its folder tells apart requests of the same name (Login of admin, Login of biller).
+    const folder = parentOf(pin.path) ? findNode(collection.children, parentOf(pin.path)) : undefined
+    return [{ collection, node, place: folder?.name ?? collection.name }]
+  })
+  if (items.length === 0) return null
+
+  return (
+    <div className="mb-1 border-b border-border pb-1" aria-label="Pinned requests">
+      <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted">
+        <Pin className="size-3" /> Pinned
+      </div>
+      {items.map(({ collection, node, place }) => (
+        <div
+          key={`${collection.slug}:${node.path}`}
+          className={clsx(
+            'group flex h-7 cursor-pointer items-center gap-1.5 rounded px-1.5 hover:bg-hover',
+            activeTabId === tabId('request', collection.slug, node.path) && 'bg-hover text-fg'
+          )}
+          title={`${collection.name} / ${node.path}`}
+          onClick={() => openTab('request', collection.slug, node.path)}
+        >
+          <span className="size-1.5 shrink-0 rounded-full" style={{ background: collection.color }} />
+          <MethodLabel method={node.method} />
+          <span className="min-w-0 flex-1 truncate">{node.name}</span>
+          <span className="max-w-24 shrink-0 truncate text-[11px] text-muted group-hover:hidden">{place}</span>
+          <IconButton
+            label={`Unpin ${node.name}`}
+            className="hidden size-6 group-hover:inline-flex"
+            onClick={(e) => {
+              e.stopPropagation()
+              togglePin(collection.slug, node.path)
+            }}
+          >
+            <PinOff className="size-3.5" />
+          </IconButton>
+        </div>
+      ))}
     </div>
   )
 }
@@ -342,6 +404,7 @@ function NodeRow({ collection, node, search }: { collection: CollectionSummary; 
   const activeTabId = useApp((s) => s.activeTabId)
   const slug = collection.slug
   const isActive = node.kind === 'request' && activeTabId === tabId('request', slug, node.path)
+  const pinned = useIsPinned(slug, node.path)
 
   const rename = async (): Promise<void> => {
     const name = await prompt({ title: `Rename ${node.kind}`, label: 'Name', initial: node.name, confirmLabel: 'Rename' })
@@ -406,13 +469,23 @@ function NodeRow({ collection, node, search }: { collection: CollectionSummary; 
           <FolderIcon className="size-3.5 shrink-0 text-muted" />
         </>
       ) : (
-        <span className="w-10 shrink-0 text-right font-mono text-[10px] font-bold" style={{ color: methodColor(node.method) }}>
-          {node.method.length > 6 ? node.method.slice(0, 5) : node.method}
-        </span>
+        <MethodLabel method={node.method} />
       )}
       <span className="min-w-0 flex-1 truncate">
         <Highlighted text={node.name} words={search} />
       </span>
+      {node.kind === 'request' && (
+        <IconButton
+          label={pinned ? `Unpin ${node.name}` : `Pin ${node.name}`}
+          className={clsx('size-6', pinned ? 'text-accent' : 'opacity-0 group-hover:opacity-100')}
+          onClick={(e) => {
+            e.stopPropagation()
+            togglePin(slug, node.path)
+          }}
+        >
+          <Pin className={clsx('size-3.5', pinned && 'fill-current')} />
+        </IconButton>
+      )}
     </div>
   )
 
@@ -444,17 +517,25 @@ function NodeRow({ collection, node, search }: { collection: CollectionSummary; 
                 </MenuItem>
               </>
             ) : (
-              <MenuItem
-                icon={<Copy className="size-3.5" />}
-                onSelect={() =>
-                  void actions.run(async () => {
-                    const path = await api.collections.duplicateRequest({ collection: slug, path: node.path })
-                    openTab('request', slug, path)
-                  })
-                }
-              >
-                Duplicate
-              </MenuItem>
+              <>
+                <MenuItem
+                  icon={pinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
+                  onSelect={() => togglePin(slug, node.path)}
+                >
+                  {pinned ? 'Unpin' : 'Pin'}
+                </MenuItem>
+                <MenuItem
+                  icon={<Copy className="size-3.5" />}
+                  onSelect={() =>
+                    void actions.run(async () => {
+                      const path = await api.collections.duplicateRequest({ collection: slug, path: node.path })
+                      openTab('request', slug, path)
+                    })
+                  }
+                >
+                  Duplicate
+                </MenuItem>
+              </>
             )}
             <MenuItem icon={<Pencil className="size-3.5" />} onSelect={() => void rename()}>
               Rename

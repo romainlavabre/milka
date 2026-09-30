@@ -30,6 +30,47 @@ test('creates a colored collection with a folder and a request', async () => {
   await close()
 })
 
+test('pins requests at the top, kept on this machine only', async () => {
+  const { page, root, close } = await launch()
+  await createWorkspace(page, 'Acme')
+  await createCollection(page, 'Users API')
+  await createRequest(page, 'Users API', 'List users')
+  await createRequest(page, 'Users API', 'Get user')
+  const pinned = page.getByLabel('Pinned requests')
+  await expect(pinned).toBeHidden()
+
+  // Pinned from the tree button, then from the menu: they stack in that order.
+  await page.getByRole('button', { name: 'Pin Get user' }).click()
+  await page.locator('aside').getByText('List users').click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Pin', exact: true }).click()
+  await expect(pinned.locator('[title]')).toHaveText([/Get user/, /List users/])
+
+  // A renamed request stays pinned, and the pins survive a restart of the window.
+  // The last one is the row of the tree, after the pinned section.
+  await page.locator('aside').getByText('Get user').last().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Rename' }).click()
+  await answerPrompt(page, 'Get one user')
+  await expect(pinned.locator('[title]')).toHaveText([/Get one user/, /List users/])
+  await page.reload()
+  await expect(pinned.locator('[title]')).toHaveText([/Get one user/, /List users/])
+  // Nothing about pins is written in the workspace.
+  const collection = join(root, 'data/workspaces/acme/collections/users-api')
+  for (const file of ['collection.yaml', 'get-one-user.yaml', 'list-users.yaml'])
+    expect(readFileSync(join(collection, file), 'utf8')).not.toMatch(/pin/i)
+
+  // The unpin button of the pinned section shows on hover.
+  await pinned.locator('[title]').filter({ hasText: 'List users' }).hover()
+  await pinned.getByRole('button', { name: 'Unpin List users' }).click()
+  await expect(pinned.locator('[title]')).toHaveText([/Get one user/])
+  // Deleting a pinned request removes its pin.
+  await page.locator('aside').getByText('Get one user').last().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Delete' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click()
+  await expect(pinned).toBeHidden()
+
+  await close()
+})
+
 test('searches the folders and requests of a collection', async () => {
   const { page, close } = await launch()
   await createWorkspace(page, 'Acme')
