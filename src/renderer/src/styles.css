@@ -74,6 +74,13 @@ select,
   user-select: text;
 }
 
+/* The popup of a native select ignores color-scheme on Linux and stays white. */
+select option,
+select optgroup {
+  background: var(--panel-2);
+  color: var(--fg);
+}
+
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
