@@ -1,12 +1,19 @@
-// MCP server: lets an AI assistant browse, create, change, move and delete
-// collections, folders, requests (with several bodies) and environments, and
-// send requests. Files are written in the workspace like the app does; the
+// MCP server: lets an AI assistant browse, import, create, change, move and
+// delete collections, folders, requests (with several bodies) and
+// environments, and send requests. Files are written in the workspace like the app does; the
 // app shows them live and commits them at the next Sync.
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { Cookies } from '../core/cookies'
 import { executeRequest } from '../core/engine'
 import { environmentValues, secretsFromProcessEnv } from '../core/environment'
+import { importBruno } from '../core/import/bruno'
+import { importCurl } from '../core/import/curl'
+import { writeImported } from '../core/import/imported'
+import { importOpenApi } from '../core/import/openapi'
+import { importPostman } from '../core/import/postman'
 import { WorkspaceStore } from '../core/layout/store'
 import {
   AUTH_TYPES,
@@ -29,6 +36,8 @@ import {
 } from '../core/model'
 import { slugify } from '../core/slug'
 import { knownWorkspaces } from './workspaces'
+
+const IMPORT_FORMATS = ['bruno', 'postman', 'openapi', 'curl'] as const
 
 export interface McpOptions {
   /** Fixed workspace folder (--workspace); otherwise the workspaces of the app. */
@@ -262,6 +271,63 @@ export function createMcpServer(options: McpOptions): McpServer {
         }
         const { id } = workspaceOf(workspace).writeCollection(null, collection)
         return { collection: id }
+      }
+    )
+  )
+
+  server.registerTool(
+    'import_collection',
+    {
+      title: 'Import collection',
+      description:
+        'Imports a Bruno collection (folder with bruno.json or opencollection.yml), a Postman collection v2.1 or an OpenAPI 3 ' +
+        'document as a new collection; or creates a request from a cURL command in an existing collection. Give the source as ' +
+        'a path, or its content as text. Secret values are never imported: only the names of secret variables.',
+      inputSchema: {
+        workspace: workspaceArg,
+        format: z.enum(IMPORT_FORMATS),
+        path: z.string().optional().describe('Absolute path of the Bruno folder, or of the Postman / OpenAPI file'),
+        text: z.string().optional().describe('Postman JSON, OpenAPI YAML or JSON, or the cURL command, instead of a path'),
+        collection: z.string().optional().describe('cURL only: collection slug to add the request to'),
+        parent: z.string().default('').describe('cURL only: folder path in the collection, empty for its root'),
+        name: z.string().optional().describe('cURL only: name of the request, e.g. "Create user"')
+      }
+    },
+    tool(
+      ({
+        workspace,
+        format,
+        path,
+        text,
+        collection,
+        parent,
+        name
+      }: {
+        workspace?: string
+        format: (typeof IMPORT_FORMATS)[number]
+        path?: string
+        text?: string
+        collection?: string
+        parent: string
+        name?: string
+      }) => {
+        const store = workspaceOf(workspace)
+        if (format === 'curl') {
+          if (!text) throw new Error('Give the cURL command as text')
+          if (!collection) throw new Error('Give the collection to add the request to')
+          const request = importCurl(text)
+          const written = store.writeRequest(collection, parent, null, name ? { ...request, name } : request)
+          return { collection, path: written.id }
+        }
+        if (format === 'bruno') {
+          if (!path) throw new Error('Give the path of the Bruno collection folder')
+          const result = writeImported(store, importBruno(resolve(path)))
+          return { collection: result.slug, requests: result.requests, warnings: result.warnings }
+        }
+        if (!path && !text) throw new Error(`Give the ${format === 'postman' ? 'Postman' : 'OpenAPI'} document as a path or as text`)
+        const source = text ?? readFileSync(resolve(path!), 'utf8')
+        const result = writeImported(store, format === 'postman' ? importPostman(source) : importOpenApi(source))
+        return { collection: result.slug, requests: result.requests, warnings: result.warnings }
       }
     )
   )

@@ -1,4 +1,4 @@
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
@@ -56,6 +56,7 @@ describe('MCP server', () => {
       'get_collection_tree',
       'get_folder',
       'get_request',
+      'import_collection',
       'list_collections',
       'list_environments',
       'list_workspaces',
@@ -248,6 +249,36 @@ describe('MCP server', () => {
     expect(await json('update_environment', { collection: 'api', environment: 'staging', name: 'Preprod' })).toMatchObject({
       environment: 'preprod'
     })
+  })
+
+  it('imports Bruno from a path, OpenAPI as text, and a cURL command into a collection', async () => {
+    const fixtures = join(__dirname, '../fixtures')
+    expect(await json('import_collection', { format: 'bruno', path: join(fixtures, 'bruno-yaml/collections/shop') })).toEqual({
+      collection: 'shop-api',
+      requests: 2,
+      warnings: ['orders/Live.yml: websocket requests are not supported yet, skipped']
+    })
+    expect(
+      await json('import_collection', { format: 'openapi', text: readFileSync(join(fixtures, 'petstore.yaml'), 'utf8') })
+    ).toMatchObject({ collection: 'petstore', requests: 5 })
+    expect(
+      await json('import_collection', {
+        format: 'curl',
+        text: `curl -X POST '${server.url}/users' -H 'Content-Type: application/json' --data '{"name":"Ada"}'`,
+        collection: 'shop-api',
+        parent: 'orders',
+        name: 'Create user'
+      })
+    ).toEqual({ collection: 'shop-api', path: 'orders/create-user.yaml' })
+    const store = new WorkspaceStore(join(root, 'ws'))
+    expect(store.readRequest('shop-api', 'orders/create-user.yaml')).toMatchObject({ method: 'POST', name: 'Create user' })
+    expect(store.readEnvironment('shop-api', 'local').secrets).toEqual(['token'])
+
+    expect(await call('import_collection', { format: 'curl', text: 'curl https://x' })).toMatchObject({
+      isError: true,
+      text: 'Give the collection to add the request to'
+    })
+    expect(await call('import_collection', { format: 'postman' })).toMatchObject({ isError: true })
   })
 
   it('moves and deletes requests and folders', async () => {

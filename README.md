@@ -183,6 +183,8 @@ Other commands: `milka import bruno|postman|openapi <source>`, `milka import cur
 
 - read: `list_workspaces`, `list_collections`, `get_collection_tree`, `get_collection`, `get_folder`, `get_request`,
   `list_environments`;
+- import: `import_collection`, from Bruno, Postman or OpenAPI (a path, or the content as text), or a cURL command
+  into a collection;
 - create: `create_collection`, `create_folder`, `create_request` (with several bodies), `add_body`,
   `create_environment`;
 - change: `update_collection` and `update_folder` (name, color, headers, auth, variables, scripts, tests, docs),
