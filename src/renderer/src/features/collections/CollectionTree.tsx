@@ -173,7 +173,7 @@ function PinnedRequests({ collections }: { collections: CollectionSummary[] }) {
 }
 
 function CollectionRow({ collection }: { collection: CollectionSummary }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const actions = useActions()
   const [dropping, setDropping] = useState(false)
   const [importingCurl, setImportingCurl] = useState(false)
