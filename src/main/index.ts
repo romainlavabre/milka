@@ -1,5 +1,5 @@
 // Electron entry point: window, IPC registration and services.
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { app, BrowserWindow, ipcMain, Menu, safeStorage, shell } from 'electron'
 import type { ZodType } from 'zod'
 import { API_METHODS, type Api, type ApiEvents } from '@shared/api'
@@ -9,7 +9,8 @@ import { schemas } from './ipc/schemas'
 import { ExecutionService } from './execution'
 import { SecretStore, createCipher } from './secrets'
 import { SettingsStore } from './settings'
-import { ContentService } from './workspace/content'
+import { JsonStore } from './jsonStore'
+import { ContentService, secretScope } from './workspace/content'
 import { WorkspaceManager } from './workspace/manager'
 import { WorkspaceWatcher } from './workspace/watcher'
 import type { WorkspaceState } from '@shared/types'
@@ -110,16 +111,32 @@ function startApp(): void {
   })
 }
 
-/** `milka run …` and the other commands run in the terminal, without window. */
+/**
+ * `milka run …` and the other commands run in the terminal, without window.
+ * Unlike the standalone Node CLI, they can read the secrets typed in the app,
+ * once Electron is ready to use the system keyring.
+ */
 function startCli(args: string[]): void {
-  void runCli(args, {
-    stdout: (text) => process.stdout.write(text),
-    stderr: (text) => process.stderr.write(text),
-    cwd: process.cwd(),
-    env: process.env,
-    color: !!process.stdout.isTTY && !process.env.NO_COLOR,
-    version: app.getVersion()
-  }).then((code) => app.exit(code))
+  void app
+    .whenReady()
+    .then(() => {
+      const dataDir = app.getPath('userData')
+      const secrets = new SecretStore(join(dataDir, 'secrets.json'), createCipher(safeStorage, join(dataDir, 'secrets.key')))
+      const registry = new JsonStore<WorkspaceState>(join(dataDir, 'workspaces.json'), () => ({ repos: [], activeRepoId: null }))
+      return runCli(args, {
+        stdout: (text) => process.stdout.write(text),
+        stderr: (text) => process.stderr.write(text),
+        cwd: process.cwd(),
+        env: process.env,
+        color: !!process.stdout.isTTY && !process.env.NO_COLOR,
+        version: app.getVersion(),
+        secrets(workspacePath, collection, env) {
+          const repo = registry.read().repos.find((r) => resolve(r.path) === resolve(workspacePath))
+          return repo ? secrets.get(repo.id, secretScope(collection, env)) : {}
+        }
+      })
+    })
+    .then((code) => app.exit(code))
 }
 
 function ready(): void {

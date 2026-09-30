@@ -12,6 +12,7 @@ import { importPostman } from '../core/import/postman'
 import { WorkspaceStore } from '../core/layout/store'
 import { ANSI_COLORS, NO_COLORS, consoleCase, consoleSummary, jsonReport, junitReport } from '../core/reporters'
 import { runCollection, type RunSummary } from '../core/runner'
+import { createMcpServer } from '../mcp/server'
 import { findWorkspaceRoot, resolveTarget, UsageError } from './workspace'
 
 export interface CliIo {
@@ -22,6 +23,8 @@ export interface CliIo {
   /** Colors on the terminal. */
   color: boolean
   version: string
+  /** Local secret values of an environment, when the app's secret store is reachable (app binary only). */
+  secrets?(workspacePath: string, collection: string, env: string): Record<string, string>
 }
 
 export const COMMANDS = ['run', 'import', 'export', 'mcp', 'help', 'version', '--help', '-h', '--version', '-v']
@@ -38,6 +41,7 @@ Usage:
                                         Create a request from a cURL command
   milka export openapi <collection> [-o file]
                                         Export a collection as OpenAPI 3.1 (stdout by default)
+  milka mcp [--workspace <folder>]      MCP server on stdio, for AI assistants
   milka help                            Show this help
 
   Imports go to the workspace of the current folder, or of --workspace <folder>.
@@ -110,7 +114,9 @@ async function run(args: string[], io: CliIo): Promise<number> {
   for (const collection of collections) {
     const envSlug = values.env ? store.findEnvironment(collection, values.env) : null
     const secretNames = envSlug ? store.readEnvironment(collection, envSlug).secrets : []
-    const environment = environmentValues(store, collection, envSlug, secretsFromProcessEnv(secretNames, io.env))
+    // Secrets typed in the app on this machine, then CI variables, then --env-var.
+    const localSecrets = envSlug && io.secrets ? io.secrets(target.root, collection, envSlug) : {}
+    const environment = environmentValues(store, collection, envSlug, { ...localSecrets, ...secretsFromProcessEnv(secretNames, io.env) })
     environment.vars = { ...environment.vars, ...overrides }
     const missing = secretNames.filter((name) => environment.vars[name] === undefined)
     const name = store.readCollection(collection).name
@@ -206,6 +212,26 @@ async function exportCommand(args: string[], io: CliIo): Promise<number> {
   return 0
 }
 
+/** Serves MCP on stdin/stdout until the client disconnects. */
+async function mcpCommand(args: string[], io: CliIo): Promise<number> {
+  const { values } = parseArgs({ args, options: { workspace: { type: 'string' } } })
+  const { StdioServerTransport } = await import('@modelcontextprotocol/sdk/server/stdio.js')
+  const server = createMcpServer({
+    workspace: values.workspace ? resolve(io.cwd, values.workspace) : undefined,
+    env: io.env,
+    version: io.version,
+    secrets: io.secrets
+  })
+  const transport = new StdioServerTransport()
+  const closed = new Promise<void>((done) => {
+    transport.onclose = () => done()
+    process.stdin.on('end', () => done())
+  })
+  await server.connect(transport)
+  await closed
+  return 0
+}
+
 /** Runs a command; returns the process exit code. */
 export async function runCli(argv: string[], io: CliIo): Promise<number> {
   const [command, ...args] = argv
@@ -217,6 +243,8 @@ export async function runCli(argv: string[], io: CliIo): Promise<number> {
         return await importCommand(args, io)
       case 'export':
         return await exportCommand(args, io)
+      case 'mcp':
+        return await mcpCommand(args, io)
       case 'version':
       case '--version':
       case '-v':
