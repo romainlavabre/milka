@@ -29,6 +29,7 @@
     "src/core/assert-labels.ts",
     "src/core/script-typings.ts",
     "src/core/tree-search.ts",
+    "src/core/varSyntax.ts",
     "src/preload/*.d.ts"
   ]
 }

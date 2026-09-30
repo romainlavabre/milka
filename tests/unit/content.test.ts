@@ -98,4 +98,23 @@ describe('ContentService', () => {
     ])
     expect(alice.content.listCollections()[0].children).toMatchObject([{ kind: 'folder', children: [{ path: 'users/ping-copy.yaml' }] }])
   })
+
+  it('lists the variables a folder sees with an environment, secrets only once typed', async () => {
+    const alice = content('alice')
+    await alice.ws.create('Local')
+    const row = (name: string, enabled = true) => ({ name, value: 'x', enabled, description: '' })
+    const slug = await alice.content.saveCollection(null, { ...newCollection('API'), vars: [row('baseUrl'), row('off', false)] })
+    const users = await alice.content.saveFolder(slug, '', null, { ...newFolder('Users'), vars: [row('userId')] })
+    const admins = await alice.content.saveFolder(slug, users, null, { ...newFolder('Admins'), vars: [row('adminId')] })
+    await alice.content.saveFolder(slug, '', null, { ...newFolder('Orders'), vars: [row('orderId')] })
+    const env = await alice.content.saveEnvironment(
+      slug,
+      null,
+      { ...newEnvironment('Dev'), vars: [row('hydraUrl')], secrets: ['token', 'untyped'] },
+      { token: 't' }
+    )
+
+    expect(alice.content.visibleVariables(slug, '', null)).toEqual(['baseUrl'])
+    expect(alice.content.visibleVariables(slug, admins, env)).toEqual(['adminId', 'baseUrl', 'hydraUrl', 'token', 'userId'])
+  })
 })

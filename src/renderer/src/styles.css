@@ -95,6 +95,14 @@ select optgroup {
   background: transparent;
 }
 
+/* `{{variables}}` in the Monaco editors, green when defined, red when not. */
+.milka-var-defined {
+  color: var(--success) !important;
+}
+.milka-var-undefined {
+  color: var(--danger) !important;
+}
+
 /* Scrollable strips (tabs) without a visible scrollbar. */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

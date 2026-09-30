@@ -14,6 +14,7 @@ import { KeyValueTable, keyValue } from '../../components/KeyValueTable'
 import { PanelTabs } from '../../components/PanelTabs'
 import { ScriptsEditor, TestsEditor } from '../../components/ScriptsEditor'
 import { Button, Checkbox, ErrorBox, Field, Input, Spinner } from '../../components/ui'
+import { definedNames, VariableInput, VariableScopeProvider, visibleVariablesKey } from '../../components/variables'
 import { retargetTabs, tabId } from '../../store'
 import { Padded } from '../collections/SettingsPanels'
 import { methodColor, parentOf, useRefreshContent } from '../collections/useCollections'
@@ -48,8 +49,12 @@ export function RequestView({ collection, path }: { collection: string; path: st
   })
 
   const send = useCallback(() => {
-    if (draft) void sendRequest({ tabId: id, collection, path, request: draft, env })
-  }, [draft, id, collection, path, env])
+    // Scripts may set runtime variables: refresh which ones are defined.
+    if (draft)
+      void sendRequest({ tabId: id, collection, path, request: draft, env }).then(() =>
+        queryClient.invalidateQueries({ queryKey: visibleVariablesKey(collection) })
+      )
+  }, [draft, id, collection, path, env, queryClient])
 
   useShortcut('Enter', send)
 
@@ -77,6 +82,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
   ]
 
   return (
+    <VariableScopeProvider collection={collection} folder={parentOf(path)} extra={definedNames(draft.vars.pre, draft.vars.post)}>
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
         <select
@@ -92,7 +98,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
             </option>
           ))}
         </select>
-        <Input
+        <VariableInput
           aria-label="URL"
           className="font-mono text-xs"
           value={displayUrl(draft.url, draft.params)}
@@ -135,6 +141,7 @@ export function RequestView({ collection, path }: { collection: string; path: st
         </Panel>
       </Group>
     </div>
+    </VariableScopeProvider>
   )
 }
 

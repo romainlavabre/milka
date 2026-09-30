@@ -74,6 +74,9 @@ export function createHandlers({
       move: ({ collection, from, parent, before }) => content.move(collection, from, parent, before),
       async variableNames({ collection }) {
         return [...new Set([...content.variableNames(collection), ...Object.keys(execution.runtimeVars())])].sort()
+      },
+      async visibleVariables({ collection, folder, env }) {
+        return [...new Set([...content.visibleVariables(collection, folder, env), ...Object.keys(execution.runtimeVars())])].sort()
       }
     },
     environments: {

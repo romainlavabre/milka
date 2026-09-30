@@ -45,6 +45,8 @@ export interface Api {
     move(args: { collection: string; from: string; parent: string; before: string | null }): Promise<string>
     /** Variable names known in a collection (for script autocompletion). */
     variableNames(args: { collection: string }): Promise<string[]>
+    /** Variable names a request of `folder` ('' for the root) resolves with `env`, runtime variables included. */
+    visibleVariables(args: { collection: string; folder: string; env: string | null }): Promise<string[]>
   }
   environments: {
     list(args: { collection: string }): Promise<EnvironmentSummary[]>
@@ -161,7 +163,8 @@ export const API_METHODS: { [D in keyof Api]: (keyof Api[D])[] } = {
     'duplicateRequest',
     'removeRequest',
     'move',
-    'variableNames'
+    'variableNames',
+    'visibleVariables'
   ],
   environments: ['list', 'get', 'save', 'remove'],
   http: ['send', 'cancel', 'runtimeVars', 'clearRuntimeVars', 'cookies', 'deleteCookie', 'clearCookies'],

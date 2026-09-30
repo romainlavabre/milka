@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import type { KeyValue } from '@core/model'
 import { useRowReorder } from './reorder'
 import { IconButton } from './ui'
+import { VariableInput } from './variables'
 
 export function KeyValueTable<T extends KeyValue>({
   rows,
@@ -40,11 +41,11 @@ export function KeyValueTable<T extends KeyValue>({
           {rows.map((row, index) => (
             <tr key={index} className="group border-b border-border last:border-b-0" {...(reorderable ? reorder.rowProps(index) : {})}>
               {reorderable && <td className="w-5">{reorder.handle(index)}</td>}
-              <td className="w-8 border-r border-border text-center">
+              <td className="w-8 border-r border-border align-middle">
                 <input
                   type="checkbox"
                   aria-label="Enabled"
-                  className="size-3.5 accent-[var(--accent)]"
+                  className="mx-auto block size-3.5 accent-[var(--accent)]"
                   checked={row.enabled}
                   onChange={(e) => update(index, { enabled: e.target.checked } as Partial<T>)}
                 />
@@ -62,7 +63,8 @@ export function KeyValueTable<T extends KeyValue>({
                 {valueCell ? (
                   valueCell(row, (patch) => update(index, patch))
                 ) : (
-                  <input
+                  <VariableInput
+                    bare
                     className={cell}
                     value={row.value}
                     placeholder={valuePlaceholder}

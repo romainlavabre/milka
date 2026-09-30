@@ -8,7 +8,9 @@ import { importCurl } from '@core/import/curl'
 import { writeImported, type ImportResult } from '@core/import/imported'
 import { importOpenApi } from '@core/import/openapi'
 import { importPostman, importPostmanEnvironment } from '@core/import/postman'
+import { environmentValues } from '@core/environment'
 import { WorkspaceStore } from '@core/layout/store'
+import { enabledVars } from '@core/vars'
 import type { Collection, CollectionSummary, Environment, EnvironmentSummary, Folder, HttpRequest } from '@core/model'
 import type { EnvironmentDraft } from '@shared/types'
 import type { SecretStore, SecretValues } from '../secrets'
@@ -184,6 +186,22 @@ export class ContentService {
       }
     }
     walk(store.readTree(slug))
+    return [...names].sort()
+  }
+
+  /**
+   * Names a request of `folder` ('' for the root) can use with `env`: the
+   * collection, each enclosing folder and the environment, as the engine
+   * resolves them. A secret counts only once its value is typed.
+   */
+  visibleVariables(slug: string, folder: string, env: string | null): string[] {
+    const store = this.store()
+    const names = new Set<string>(Object.keys(enabledVars(store.readCollection(slug).vars)))
+    const parts = folder ? folder.split('/') : []
+    for (let i = 1; i <= parts.length; i++) {
+      Object.keys(enabledVars(store.readFolder(slug, parts.slice(0, i).join('/')).vars)).forEach((name) => names.add(name))
+    }
+    if (env) Object.keys(environmentValues(store, slug, env, this.secretValues(slug, env)).vars).forEach((name) => names.add(name))
     return [...names].sort()
   }
 

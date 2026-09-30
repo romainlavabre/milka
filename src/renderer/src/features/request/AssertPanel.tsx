@@ -30,11 +30,11 @@ export function AssertPanel({ assertions, onChange }: { assertions: Assertion[];
             {assertions.map((assertion, index) => (
               <tr key={index} className="group border-b border-border last:border-b-0" {...reorder.rowProps(index)}>
                 <td className="w-5">{reorder.handle(index)}</td>
-                <td className="w-8 border-r border-border text-center">
+                <td className="w-8 border-r border-border align-middle">
                   <input
                     type="checkbox"
                     aria-label="Enabled"
-                    className="size-3.5 accent-[var(--accent)]"
+                    className="mx-auto block size-3.5 accent-[var(--accent)]"
                     checked={assertion.enabled}
                     onChange={(e) => update(index, { enabled: e.target.checked })}
                   />

@@ -1,6 +1,7 @@
 // Authentication settings of a request, folder or collection.
 import type { Auth, AuthType } from '@core/model'
 import { Field, Input, Select } from './ui'
+import { VariableInput } from './variables'
 
 const LABELS: Record<AuthType, string> = {
   inherit: 'Inherit from parent',
@@ -29,16 +30,16 @@ export function AuthEditor({ auth, onChange, allowInherit }: { auth: Auth; onCha
       {auth.type === 'basic' && (
         <>
           <Field label="Username">
-            <Input value={auth.username} onChange={(e) => set({ username: e.target.value })} placeholder="{{username}}" />
+            <VariableInput value={auth.username} onChange={(e) => set({ username: e.target.value })} placeholder="{{username}}" />
           </Field>
           <Field label="Password" hint="Use a secret variable, e.g. {{password}}, to keep it out of the repository.">
-            <Input value={auth.password} onChange={(e) => set({ password: e.target.value })} placeholder="{{password}}" />
+            <VariableInput value={auth.password} onChange={(e) => set({ password: e.target.value })} placeholder="{{password}}" />
           </Field>
         </>
       )}
       {auth.type === 'bearer' && (
         <Field label="Token" hint="Use a secret variable, e.g. {{token}}, to keep it out of the repository.">
-          <Input value={auth.token} onChange={(e) => set({ token: e.target.value })} placeholder="{{token}}" />
+          <VariableInput value={auth.token} onChange={(e) => set({ token: e.target.value })} placeholder="{{token}}" />
         </Field>
       )}
       {auth.type === 'apikey' && (
@@ -47,7 +48,7 @@ export function AuthEditor({ auth, onChange, allowInherit }: { auth: Auth; onCha
             <Input value={auth.key} onChange={(e) => set({ key: e.target.value })} placeholder="X-API-Key" />
           </Field>
           <Field label="Value">
-            <Input value={auth.value} onChange={(e) => set({ value: e.target.value })} placeholder="{{apiKey}}" />
+            <VariableInput value={auth.value} onChange={(e) => set({ value: e.target.value })} placeholder="{{apiKey}}" />
           </Field>
           <Field label="Add to">
             <Select value={auth.in} onChange={(e) => set({ in: e.target.value as 'header' | 'query' })}>

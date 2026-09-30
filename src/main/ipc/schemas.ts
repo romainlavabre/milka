@@ -38,7 +38,8 @@ export const schemas: { [D in keyof Api]: { [M in keyof Api[D]]: z.ZodType } } =
     duplicateRequest: z.object({ collection, path: nodePath }),
     removeRequest: z.object({ collection, path: nodePath }),
     move: z.object({ collection, from: nodePath, parent: z.string(), before: nodePath.nullable() }),
-    variableNames: z.object({ collection })
+    variableNames: z.object({ collection }),
+    visibleVariables: z.object({ collection, folder: z.string().max(1000), env: env.nullable() })
   },
   environments: {
     list: z.object({ collection }),

@@ -7,6 +7,7 @@ import { api } from '../../lib/bridge'
 import { confirm, prompt, toast } from '../../components/feedback'
 import { CodeEditor, type CodeLanguage } from '../../components/CodeEditor'
 import { KeyValueTable, keyValue } from '../../components/KeyValueTable'
+import { VariableInput } from '../../components/variables'
 import { Button, EmptyState, IconButton, Input, Select } from '../../components/ui'
 import { menuContentClass, menuItemClass } from '../workspace/WorkspaceSwitcher'
 
@@ -201,7 +202,8 @@ function BodyContent({ body, setBody }: { body: Body; setBody: (patch: Partial<B
                     row.type === 'file' ? (
                       <FilePicker value={row.value} onChange={(value) => update({ value })} compact />
                     ) : (
-                      <input
+                      <VariableInput
+                        bare
                         className="h-7 w-full bg-transparent px-2 font-mono text-xs outline-none focus:bg-panel-2"
                         value={row.value}
                         placeholder="Value"
@@ -226,16 +228,16 @@ function BodyContent({ body, setBody }: { body: Body; setBody: (patch: Partial<B
       return (
         <div className="flex h-full flex-col">
           <div className="min-h-0 flex-[2]">
-            <CodeEditor language="graphql" value={body.content} onChange={(content) => setBody({ content })} placeholder="query { … }" />
+            <CodeEditor language="graphql" highlightVariables value={body.content} onChange={(content) => setBody({ content })} placeholder="query { … }" />
           </div>
           <div className="border-y border-border px-3 py-1 text-[11px] text-muted">Variables (JSON)</div>
           <div className="min-h-0 flex-1">
-            <CodeEditor language="json" value={body.variables} onChange={(variables) => setBody({ variables })} />
+            <CodeEditor language="json" highlightVariables value={body.variables} onChange={(variables) => setBody({ variables })} />
           </div>
         </div>
       )
     default:
-      return <CodeEditor language={LANGUAGES[body.type] ?? 'plaintext'} value={body.content} onChange={(content) => setBody({ content })} />
+      return <CodeEditor language={LANGUAGES[body.type] ?? 'plaintext'} highlightVariables value={body.content} onChange={(content) => setBody({ content })} />
   }
 }
 

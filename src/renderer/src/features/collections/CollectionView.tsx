@@ -9,6 +9,7 @@ import { useDraft } from '../../lib/useDraft'
 import { ColorPalette } from '../../components/ColorPicker'
 import { PanelTabs } from '../../components/PanelTabs'
 import { Button, ErrorBox, Spinner } from '../../components/ui'
+import { definedNames, VariableScopeProvider } from '../../components/variables'
 import { retargetTabs, tabId } from '../../store'
 import { EnvironmentsPanel } from '../environments/EnvironmentsPanel'
 import { SettingsPanel, settingsTabs, type SettingsTab } from './SettingsPanels'
@@ -71,14 +72,16 @@ export function CollectionView({ collection }: { collection: string }) {
         {tab === 'environments' ? (
           <EnvironmentsPanel collection={collection} />
         ) : (
-          <SettingsPanel
-            tab={tab}
-            value={draft}
-            onChange={setDraft}
-            scope={`collection/${collection}`}
-            collection={collection}
-            allowInherit={false}
-          />
+          <VariableScopeProvider collection={collection} folder="" extra={definedNames(draft.vars)}>
+            <SettingsPanel
+              tab={tab}
+              value={draft}
+              onChange={setDraft}
+              scope={`collection/${collection}`}
+              collection={collection}
+              allowInherit={false}
+            />
+          </VariableScopeProvider>
         )}
       </div>
     </div>

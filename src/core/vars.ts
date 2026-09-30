@@ -6,10 +6,10 @@
 // `{{$randomInt}}`. Unknown names are left as written, so they stand out.
 import { randomInt, randomUUID } from 'node:crypto'
 import type { KeyValue } from './model'
+import { VARIABLE_PATTERN as PATTERN } from './varSyntax'
 
 export type VarMap = Record<string, string>
 
-const PATTERN = /\{\{\s*([^{}\s]+)\s*\}\}/g
 const MAX_DEPTH = 5
 
 export function builtinVariable(name: string, processEnv: Record<string, string | undefined>): string | undefined {

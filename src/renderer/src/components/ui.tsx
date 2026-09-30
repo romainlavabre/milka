@@ -86,7 +86,7 @@ export function Tooltip({ content, children }: { content: ReactNode; children: R
   )
 }
 
-const fieldClass =
+export const fieldClass =
   'w-full rounded-md border border-border bg-bg px-2 text-fg placeholder:text-muted/70 outline-none focus:border-accent disabled:opacity-60'
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...props }, ref) {
