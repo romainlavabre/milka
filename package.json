@@ -20,7 +20,8 @@
     "test": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:e2e": "npm run build && playwright test",
-    "dist": "npm run build && electron-builder --linux"
+    "docs:screenshots": "npm run build && MILKA_SCREENSHOTS=docs/images playwright test e2e/docs-screenshots.spec.ts",
+    "dist":"npm run build && electron-builder --linux"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.31.0",
