@@ -53,14 +53,21 @@ test('pins requests at the top, kept on this machine only', async () => {
   await expect(pinned.locator('[title]')).toHaveText([/Get one user/, /List users/])
   await page.reload()
   await expect(pinned.locator('[title]')).toHaveText([/Get one user/, /List users/])
+  // Collections start collapsed: open it to reach the rows of the tree again.
+  await page.locator('aside').getByText('Users API', { exact: true }).last().click()
+  await expect(page.locator('aside').getByText('List users')).toHaveCount(2)
   // Nothing about pins is written in the workspace.
   const collection = join(root, 'data/workspaces/acme/collections/users-api')
   for (const file of ['collection.yaml', 'get-one-user.yaml', 'list-users.yaml'])
     expect(readFileSync(join(collection, file), 'utf8')).not.toMatch(/pin/i)
 
   // The unpin button of the pinned section shows on hover.
-  await pinned.locator('[title]').filter({ hasText: 'List users' }).hover()
-  await pinned.getByRole('button', { name: 'Unpin List users' }).click()
+  const unpin = pinned.getByRole('button', { name: 'Unpin List users' })
+  await expect(async () => {
+    await pinned.locator('[title]').filter({ hasText: 'List users' }).hover()
+    await expect(unpin).toBeVisible({ timeout: 1000 })
+  }).toPass()
+  await unpin.click()
   await expect(pinned.locator('[title]')).toHaveText([/Get one user/])
   // Deleting a pinned request removes its pin.
   await page.locator('aside').getByText('Get one user').last().click({ button: 'right' })
