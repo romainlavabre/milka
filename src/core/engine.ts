@@ -90,7 +90,8 @@ function resolveAuth(request: HttpRequest, folders: Folder[], collection: Collec
   return { ...collection.auth, type: 'none' }
 }
 
-const CONTENT_TYPES: Partial<Record<Body['type'], string>> = {
+/** Content-Type sent for each body type, unless the request sets its own. */
+export const CONTENT_TYPES: Partial<Record<Body['type'], string>> = {
   json: 'application/json',
   graphql: 'application/json',
   xml: 'application/xml',

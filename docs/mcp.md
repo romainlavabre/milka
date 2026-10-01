@@ -29,6 +29,7 @@ milka mcp --workspace <folder>
 
 | Group | Tools |
 |---|---|
+| Reference | `get_reference`: how to write scripts, tests, assertions, variables and bodies, built from the engine itself so it follows the code. The server asks the assistant to read it before writing them, so it uses the Milka API instead of the Postman one. |
 | Read | `list_workspaces`, `list_collections`, `get_collection_tree`, `get_collection`, `get_folder`, `get_request`, `list_environments` |
 | Import | `import_collection`: Bruno, Postman or OpenAPI (a path, or the content as text), or a cURL command into a collection |
 | Create | `create_collection`, `create_folder`, `create_request` (with several bodies), `add_body`, `create_environment` |

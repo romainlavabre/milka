@@ -10,7 +10,17 @@ import { VARIABLE_PATTERN as PATTERN } from './varSyntax'
 
 export type VarMap = Record<string, string>
 
-const MAX_DEPTH = 5
+/** Nesting limit of variables whose value holds other variables. */
+export const MAX_DEPTH = 5
+
+/** The built-ins resolved by builtinVariable, with what they give. */
+export const BUILTIN_VARIABLES: { name: string; description: string }[] = [
+  { name: '$uuid', description: 'a random UUID v4' },
+  { name: '$timestamp', description: 'current Unix time, in seconds' },
+  { name: '$isoTimestamp', description: 'current time, ISO 8601' },
+  { name: '$randomInt', description: 'a random integer from 0 to 999' },
+  { name: 'process.env.NAME', description: 'the environment variable NAME of the process' }
+]
 
 export function builtinVariable(name: string, processEnv: Record<string, string | undefined>): string | undefined {
   if (name.startsWith('process.env.')) return processEnv[name.slice('process.env.'.length)]

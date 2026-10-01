@@ -3,7 +3,11 @@ import { join } from 'node:path'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { OPERATOR_LABELS } from '@core/assert-labels'
 import { WorkspaceStore } from '@core/layout/store'
+import { ASSERT_OPERATORS, BODY_TYPES } from '@core/model'
+import { SCRIPT_TYPINGS } from '@core/script-typings'
+import { BUILTIN_VARIABLES } from '@core/vars'
 import { ensureWorkspaceLayout } from '@core/layout/workspace'
 import { createMcpServer } from '../../src/mcp/server'
 import { startEchoServer, type EchoServer } from './echo-server'
@@ -55,6 +59,7 @@ describe('MCP server', () => {
       'get_collection',
       'get_collection_tree',
       'get_folder',
+      'get_reference',
       'get_request',
       'import_collection',
       'list_collections',
@@ -67,6 +72,19 @@ describe('MCP server', () => {
       'update_folder',
       'update_request'
     ])
+  })
+
+  it('serves the reference of what requests hold, from the engine', async () => {
+    const scripts = (await call('get_reference', { topic: 'scripts' })).text
+    expect(scripts).toContain(SCRIPT_TYPINGS.trim())
+    const assertions = (await call('get_reference', { topic: 'assertions' })).text
+    for (const op of ASSERT_OPERATORS) expect(assertions).toContain(`\`${op}\`: ${OPERATOR_LABELS[op]}`)
+    const variables = (await call('get_reference', { topic: 'variables' })).text
+    for (const builtin of BUILTIN_VARIABLES) expect(variables).toContain(`{{${builtin.name}}}`)
+    const bodies = (await call('get_reference', { topic: 'bodies' })).text
+    for (const type of BODY_TYPES) expect(bodies).toContain(`\`${type}\``)
+    expect((await call('get_reference', { topic: 'yaml' })).text).toContain('collection.yaml')
+    expect((await call('get_reference', { topic: 'postman' })).isError).toBe(true)
   })
 
   it('creates a collection, a request with several bodies, and runs it', async () => {

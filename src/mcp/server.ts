@@ -35,6 +35,7 @@ import {
   type TreeNode
 } from '../core/model'
 import { slugify } from '../core/slug'
+import { reference, REFERENCE_TOPICS, type ReferenceTopic } from './reference'
 import { knownWorkspaces } from './workspaces'
 
 const IMPORT_FORMATS = ['bruno', 'postman', 'openapi', 'curl'] as const
@@ -164,7 +165,8 @@ export function createMcpServer(options: McpOptions): McpServer {
         'Milka stores API requests as YAML files in git workspaces. A request can hold several named bodies (payload variants) and the selected one is sent. ' +
         'Use {{variable}} placeholders for URLs, tokens and ids (e.g. {{baseUrl}}/users/:id). Folders and collections pass their headers, auth, ' +
         'variables and scripts on to the requests inside. Secret values are never readable nor writable here: declare the name, each user types ' +
-        'the value in Milka. Changes are committed by the next Sync in the Milka app, so a deletion can be undone from git.'
+        'the value in Milka. Changes are committed by the next Sync in the Milka app, so a deletion can be undone from git. ' +
+        'Scripts, tests and assertions use the Milka API, not the Postman or Bruno one: call get_reference before writing them.'
     }
   )
 
@@ -175,6 +177,19 @@ export function createMcpServer(options: McpOptions): McpServer {
     if (!found) throw new Error(`Unknown workspace "${name}". Known: ${workspaces.map((w) => w.name).join(', ')}`)
     return new WorkspaceStore(found.path)
   }
+
+  server.registerTool(
+    'get_reference',
+    {
+      title: 'Get reference',
+      description:
+        'How to write the content of requests in Milka. Call it before writing scripts, tests, assertions or variables: ' +
+        'scripts (the req, res, milka, test and expect API), assertions (operators), variables (precedence, built-ins, ' +
+        'vars.pre and vars.post), bodies (named payload variants, types, auth types), yaml (workspace layout and a full request).',
+      inputSchema: { topic: z.enum(REFERENCE_TOPICS) }
+    },
+    tool(({ topic }: { topic: ReferenceTopic }) => reference(topic))
+  )
 
   server.registerTool(
     'list_workspaces',
