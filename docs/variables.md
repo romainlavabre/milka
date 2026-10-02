@@ -3,6 +3,12 @@
 Write `{{name}}` wherever a value changes from one environment or one request to another: base URL, ids, tokens.
 Variables work in the URL, params, headers, bodies and auth fields. Spaces are allowed: `{{ name }}`.
 
+## Type `{{` to pick one
+
+Typing `{{` lists every variable the request can use, with where it comes from and its value (a secret stays masked).
+Keep typing to filter, then **Enter** or **Tab** (or a click) writes `{{name}}`; **Escape** closes the list. The list
+follows the same order as the resolution below, built-ins last. In a body, the names come as editor suggestions.
+
 ## Green and red
 
 A variable shows **green** when it resolves and **red** when it does not: a typo, a variable of another environment, a

@@ -14,12 +14,21 @@ import {
   useRef,
   useState,
   type InputHTMLAttributes,
+  type KeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode
 } from 'react'
 import { createPortal } from 'react-dom'
 import type { KeyValue } from '@core/model'
-import { isBuiltinVariable, variableTokens } from '@core/varSyntax'
+import {
+  BUILTIN_VARIABLES,
+  filterCompletions,
+  insertVariable,
+  isBuiltinVariable,
+  openVariableAt,
+  variableTokens,
+  type OpenVariable
+} from '@core/varSyntax'
 import type { VariableSource, VariableTarget, VisibleVariable } from '@shared/types'
 import { api, errorMessage } from '../lib/bridge'
 import { useDrafts } from '../lib/drafts'
@@ -38,8 +47,20 @@ export interface LocalVariables {
   set(name: string, value: string): void
 }
 
+/** A name offered when `{{` is typed. */
+export interface VariableCompletion {
+  name: string
+  /** Where it comes from. */
+  detail: string
+  /** Its value, masked for a secret; empty when there is none to show. */
+  preview: string
+  status: 'defined' | 'undefined'
+}
+
 interface Scope {
   status: VariableStatus
+  /** Every name the edited request resolves, in the order of the engine. */
+  completions: VariableCompletion[]
   /** The pointer is over `{{name}}`, drawn in `rect`. */
   hover(name: string, rect: DOMRect): void
   /** The pointer left the variable. */
@@ -137,18 +158,46 @@ export function VariableScopeProvider({
   }, [])
   useEffect(() => () => close(), [close])
 
-  const scope = useMemo<Scope | null>(
-    () =>
-      resolve && {
-        status: (name) => {
-          const resolved = resolve(name)
-          return resolved.kind === 'undefined' || (resolved.kind === 'visible' && resolved.variable.value === null) ? 'undefined' : 'defined'
-        },
-        hover,
-        leave
-      },
-    [resolve, hover, leave]
-  )
+  const { data: environments } = useEnvironments(collection)
+  const localLabel = local?.label ?? 'this editor'
+
+  const scope = useMemo<Scope | null>(() => {
+    if (!resolve || !data) return null
+    const status: VariableStatus = (name) => {
+      const resolved = resolve(name)
+      return resolved.kind === 'undefined' || (resolved.kind === 'visible' && resolved.variable.value === null) ? 'undefined' : 'defined'
+    }
+    const envName = (slug: string): string => environments?.find((e) => e.slug === slug)?.name ?? slug
+    // Same order as the engine; each name once, described by the scope it resolves from.
+    const names = [
+      ...data.filter((v) => v.source.kind === 'runtime').map((v) => v.name),
+      ...(JSON.parse(localKey) as [string, string][]).map(([name]) => name),
+      ...data.map((v) => v.name),
+      ...extraKey.split('\n').filter(Boolean),
+      ...BUILTIN_VARIABLES
+    ]
+    const completions = [...new Set(names)].map((name): VariableCompletion => {
+      const resolved = resolve(name)
+      const base = { name, status: status(name) }
+      switch (resolved.kind) {
+        case 'visible': {
+          const { value, source, secret } = resolved.variable
+          return {
+            ...base,
+            detail: describeSource(source, secret, envName),
+            preview: value === null ? 'no value on this computer' : secret ? '••••••' : value
+          }
+        }
+        case 'local':
+          return { ...base, detail: localLabel, preview: resolved.value }
+        case 'response':
+          return { ...base, detail: 'set from the response', preview: '' }
+        default:
+          return { ...base, detail: 'generated on each send', preview: '' }
+      }
+    })
+    return { status, completions, hover, leave }
+  }, [resolve, data, localKey, extraKey, environments, localLabel, hover, leave])
 
   return (
     <VariableScope.Provider value={scope}>
@@ -183,6 +232,25 @@ export function useVariableStatus(): VariableStatus | null {
 /** Reports the variable under the pointer; null outside a scope. */
 export function useVariableHover(): Pick<Scope, 'hover' | 'leave'> | null {
   return useContext(VariableScope)
+}
+
+/** The names to offer after `{{`; null outside a scope, where nothing is offered. */
+export function useVariableCompletions(): VariableCompletion[] | null {
+  return useContext(VariableScope)?.completions ?? null
+}
+
+/** Where a value comes from, as the popover and the completions say it. */
+function describeSource(source: VariableSource, secret: boolean, envName: (slug: string) => string): string {
+  switch (source.kind) {
+    case 'runtime':
+      return 'runtime (set by a script, until Milka quits)'
+    case 'collection':
+      return 'collection'
+    case 'folder':
+      return `folder ${source.path}`
+    case 'environment':
+      return `${secret ? 'secret of ' : ''}environment ${envName(source.env)}`
+  }
 }
 
 // ------------------------------------------------------------------ popover
@@ -268,16 +336,7 @@ function VariablePopover({
 
   const describe = (source: VariableSource | 'local'): string => {
     if (source === 'local') return local?.label ?? 'this editor'
-    switch (source.kind) {
-      case 'runtime':
-        return 'runtime (set by a script, until Milka quits)'
-      case 'collection':
-        return 'collection'
-      case 'folder':
-        return `folder ${source.path}`
-      case 'environment':
-        return `${secret ? 'secret of ' : ''}environment ${envName(source.env)}`
-    }
+    return describeSource(source, secret, envName)
   }
 
   const save = async (): Promise<void> => {
@@ -391,9 +450,13 @@ const COLORS = { defined: 'text-success', undefined: 'text-danger' }
  * `bare` drops the field styling (table cells pass their own classes).
  */
 export const VariableInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement> & { bare?: boolean }>(
-  function VariableInput({ bare = false, className, onScroll, onSelect, title, ...props }, ref) {
+  function VariableInput({ bare = false, className, onScroll, onSelect, onChange, onKeyDown, onBlur, title, ...props }, ref) {
     const status = useVariableStatus()
     const hovering = useVariableHover()
+    const completions = useVariableCompletions()
+    const [typing, setTyping] = useState<{ at: OpenVariable; x: number; rect: DOMRect } | null>(null)
+    const [active, setActive] = useState(0)
+    const offered = typing && completions ? filterCompletions(completions, typing.at.query) : []
     const value = String(props.value ?? '')
     const tokens = status && value.includes('{{') ? variableTokens(value) : []
     const mirrored = tokens.length > 0
@@ -411,6 +474,40 @@ export const VariableInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
       input.current = node
       if (typeof ref === 'function') ref(node)
       else if (ref) ref.current = node
+    }
+
+    // `{{` typed: offer the names, under the braces.
+    const track = (field: HTMLInputElement, typed: boolean): void => {
+      if (!completions || (!typed && !typing)) return
+      const at = field.selectionStart === field.selectionEnd ? openVariableAt(field.value, field.selectionStart ?? 0) : null
+      if (!at) return setTyping(null)
+      if (typing?.at.query !== at.query) setActive(0)
+      hovering?.leave()
+      setTyping({ at, x: caretX(field, at.from - 2), rect: field.getBoundingClientRect() })
+    }
+
+    const complete = (name: string): void => {
+      const field = input.current
+      if (!field || !typing) return
+      const next = insertVariable(field.value, typing.at, name)
+      setTyping(null)
+      // Through the native setter, so that React fires the onChange of the parent.
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, next.text)
+      field.dispatchEvent(new Event('input', { bubbles: true }))
+      // At once: keys typed right after must land after the variable. React leaves the same value alone.
+      field.setSelectionRange(next.caret, next.caret)
+    }
+
+    const onMenuKey = (e: KeyboardEvent<HTMLInputElement>): boolean => {
+      if (offered.length === 0) return false
+      if (e.key === 'ArrowDown') setActive((active + 1) % offered.length)
+      else if (e.key === 'ArrowUp') setActive((active - 1 + offered.length) % offered.length)
+      else if (e.key === 'Enter' || e.key === 'Tab') complete(offered[Math.min(active, offered.length - 1)].name)
+      else if (e.key === 'Escape') setTyping(null)
+      else return false
+      e.preventDefault()
+      e.stopPropagation()
+      return true
     }
 
     // The mirror lets the pointer through to the input: find the variable under it by position.
@@ -457,8 +554,22 @@ export const VariableInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
           }}
           onSelect={(e) => {
             sync()
+            track(e.currentTarget, false)
             onSelect?.(e)
           }}
+          onChange={(e) => {
+            track(e.currentTarget, true)
+            onChange?.(e)
+          }}
+          onKeyDown={(e) => {
+            if (!onMenuKey(e)) onKeyDown?.(e)
+          }}
+          onBlur={(e) => {
+            setTyping(null)
+            onBlur?.(e)
+          }}
+          aria-autocomplete={completions ? 'list' : undefined}
+          aria-expanded={completions ? offered.length > 0 : undefined}
         />
         {mirrored && (
           <div
@@ -468,7 +579,93 @@ export const VariableInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HT
             <span ref={text}>{segments}</span>
           </div>
         )}
+        {typing && offered.length > 0 && (
+          <VariableCompletionMenu
+            items={offered}
+            active={Math.min(active, offered.length - 1)}
+            x={typing.x}
+            rect={typing.rect}
+            onPick={complete}
+            onActive={setActive}
+          />
+        )}
       </div>
     )
   }
 )
+
+let measure: CanvasRenderingContext2D | null = null
+
+/** Where, on screen, the character at `index` of the input starts. */
+function caretX(field: HTMLInputElement, index: number): number {
+  const style = getComputedStyle(field)
+  measure ??= document.createElement('canvas').getContext('2d')
+  if (!measure) return field.getBoundingClientRect().left
+  measure.font = style.font
+  const width = measure.measureText(field.value.slice(0, Math.max(0, index))).width
+  return field.getBoundingClientRect().left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft) + width - field.scrollLeft
+}
+
+/** The names offered after `{{`, under the braces; picked with the keyboard (from the input) or the mouse. */
+function VariableCompletionMenu({
+  items,
+  active,
+  x,
+  rect,
+  onPick,
+  onActive
+}: {
+  items: VariableCompletion[]
+  active: number
+  x: number
+  rect: DOMRect
+  onPick(name: string): void
+  onActive(index: number): void
+}) {
+  const box = useRef<HTMLDivElement>(null)
+  const [position, setPosition] = useState({ top: rect.bottom + 2, left: x })
+
+  useLayoutEffect(() => {
+    const width = box.current?.offsetWidth ?? 320
+    const height = box.current?.offsetHeight ?? 200
+    const below = rect.bottom + 2 + height < window.innerHeight
+    setPosition({
+      top: below ? rect.bottom + 2 : Math.max(4, rect.top - 2 - height),
+      left: Math.max(4, Math.min(x, window.innerWidth - width - 4))
+    })
+  }, [rect, x, items.length])
+
+  useEffect(() => {
+    box.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: 'nearest' })
+  }, [active])
+
+  return createPortal(
+    <div
+      ref={box}
+      role="listbox"
+      aria-label="Variables"
+      className="fixed z-50 flex max-h-60 w-80 flex-col overflow-y-auto rounded-md border border-border bg-panel-2 py-1 text-xs text-fg shadow-lg"
+      style={position}
+      // Keeps the focus in the input.
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      {items.map((item, index) => (
+        <div
+          key={item.name}
+          role="option"
+          aria-selected={index === active}
+          className={cn('flex cursor-pointer flex-col px-2.5 py-1', index === active && 'bg-accent/15')}
+          onMouseEnter={() => onActive(index)}
+          onClick={() => onPick(item.name)}
+        >
+          <div className="flex items-baseline gap-2">
+            <span className={cn('truncate font-mono font-semibold', COLORS[item.status])}>{item.name}</span>
+            <span className="ml-auto shrink-0 truncate text-[11px] text-muted">{item.detail}</span>
+          </div>
+          {item.preview && <span className="truncate font-mono text-[11px] text-muted">{item.preview}</span>}
+        </div>
+      ))}
+    </div>,
+    document.body
+  )
+}

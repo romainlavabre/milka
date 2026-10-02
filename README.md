@@ -45,7 +45,7 @@ a system window) and to restart.
 | [Workspaces and git sync](docs/workspaces.md) | Create, clone and open workspaces; what is in them; commits, Sync and conflicts |
 | [Collections and folders](docs/collections.md) | The sidebar, collection and folder settings, colors, inheritance, auth |
 | [Requests](docs/requests.md) | The request bar and tabs, params, several bodies, body types, the response, shortcuts |
-| [Variables](docs/variables.md) | `{{variables}}`, where they come from, request variables, built-ins, hover to edit |
+| [Variables](docs/variables.md) | `{{variables}}`, where they come from, request variables, built-ins, `{{` completion, hover to edit |
 | [Environments and secrets](docs/environments-and-secrets.md) | Environments of a collection, secret values, secrets in CI |
 | [Scripts and tests](docs/scripts-and-tests.md) | Script API reference, tests and matchers, assertions, recipes (token refresh, chaining) |
 | [Cookies](docs/cookies.md) | The cookie jar and its script API |

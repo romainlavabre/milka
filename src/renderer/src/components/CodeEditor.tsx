@@ -2,9 +2,9 @@
 import { useEffect, useRef } from 'react'
 import { jsonSyntaxError } from '@core/jsonTemplate'
 import { variableTokens } from '@core/varSyntax'
-import { monaco } from '../lib/monaco'
+import { monaco, setModelVariables } from '../lib/monaco'
 import { useApp } from '../store'
-import { useVariableHover, useVariableStatus, type VariableStatus } from './variables'
+import { useVariableCompletions, useVariableHover, useVariableStatus, type VariableStatus } from './variables'
 
 export type CodeLanguage = 'json' | 'xml' | 'html' | 'plaintext' | 'typescript' | 'graphql' | 'markdown' | 'javascript'
 
@@ -28,7 +28,7 @@ export function CodeEditor({
   placeholder?: string
   /** Model URI, e.g. for scripts: TypeScript needs a `.ts` path. */
   modelPath?: string
-  /** Colours the `{{variables}}` after the enclosing variable scope. */
+  /** Colours the `{{variables}}` after the enclosing variable scope, and offers its names after `{{`. */
   highlightVariables?: boolean
 }) {
   const container = useRef<HTMLDivElement>(null)
@@ -40,10 +40,13 @@ export function CodeEditor({
   const statusRef = useRef<VariableStatus | null>(null)
   const hovering = useVariableHover()
   const hoverRef = useRef(hovering)
+  const completions = useVariableCompletions()
+  const completionsRef = useRef(completions)
   const checkJsonRef = useRef(false)
   onChangeRef.current = onChange
   statusRef.current = highlightVariables ? status : null
   hoverRef.current = highlightVariables ? hovering : null
+  completionsRef.current = highlightVariables && !readOnly ? completions : null
   // Monaco's JSON validation is off: bodies are checked here, {{variables}} accepted.
   checkJsonRef.current = language === 'json' && !readOnly
 
@@ -108,6 +111,7 @@ export function CodeEditor({
     })
     editor.current = instance
     variables.current = instance.createDecorationsCollection()
+    setModelVariables(uri, () => completionsRef.current ?? [])
     decorate()
     checkJson()
     const subscription = instance.onDidChangeModelContent(() => {
@@ -143,6 +147,7 @@ export function CodeEditor({
       subscription.dispose()
       moving.dispose()
       leaving.dispose()
+      setModelVariables(uri, null)
       variables.current = null
       instance.dispose()
       model.dispose()
