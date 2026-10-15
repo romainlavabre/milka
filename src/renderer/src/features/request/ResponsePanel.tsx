@@ -1,7 +1,7 @@
 // Response of the last send: status, body, headers, timeline, tests and console.
 import clsx from 'clsx'
 import { CheckCircle2, Copy, RotateCw, Send, SkipForward, XCircle } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { succeeded, type ExecutionResult, type Header, type ReceivedResponse } from '@core/results'
 import { CodeEditor, type CodeLanguage } from '../../components/CodeEditor'
 import { PanelTabs } from '../../components/PanelTabs'
@@ -129,6 +129,7 @@ function BodyView({ response }: { response: ReceivedResponse }) {
         </div>
       )
     }
+    if (/^application\/pdf/i.test(response.contentType)) return <PdfView response={response} />
     return (
       <EmptyState title="Binary response">
         {formatBytes(response.size)} of {response.contentType || 'unknown type'}
@@ -168,6 +169,21 @@ function BodyView({ response }: { response: ReceivedResponse }) {
       </div>
     </div>
   )
+}
+
+// Chromium's PDF viewer opens a blob URL; a data URL of a few MB would be copied on every render.
+function PdfView({ response }: { response: ReceivedResponse }) {
+  const [url, setUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    const bytes = Uint8Array.from(atob(response.body), (char) => char.charCodeAt(0))
+    const objectUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+    setUrl(objectUrl)
+    return () => URL.revokeObjectURL(objectUrl)
+  }, [response])
+
+  if (!url) return null
+  return <iframe title="PDF response" src={url} className="size-full border-0" />
 }
 
 function HeadersTable({ headers }: { headers: Header[] }) {

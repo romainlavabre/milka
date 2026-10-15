@@ -60,7 +60,9 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      spellcheck: false
+      spellcheck: false,
+      // Turns on Chromium's PDF viewer, used to preview PDF responses.
+      plugins: true
     }
   })
   mainWindow.once('ready-to-show', () => mainWindow?.show())
